@@ -18,9 +18,22 @@ struct Map {
     Map(char** _data, std::size_t _N, sycl::queue& _q)
       : data(_data), N(_N), q(_q) {}
 
-    void operator()(sycl::nd_item<2> it) const;
+    void operator()(sycl::nd_item<1> it) const;
     void runkernel() const;
     ~Map();
-};struct Combine;
-struct Reduce;
+};
+//struct Combine;
+struct Reduce{
+      char** data;
+    std::size_t N;
+    sycl::queue& q;
+
+    Reduce(char** _data, std::size_t _N, sycl::queue& _q)
+      : data(_data), N(_N), q(_q) {}
+
+    void operator()(sycl::nd_item<1> it) const;
+    void runkernel() const;
+    ~Reduce();
+
+};
 #endif
