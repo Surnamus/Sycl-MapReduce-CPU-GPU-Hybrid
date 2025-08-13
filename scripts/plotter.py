@@ -1,0 +1,58 @@
+
+import matplotlib.pyplot as plt
+import random
+#install python libs on linux pc and change path
+def randcolor():
+# Randomly select a colormap and extract a color
+  randcmapname = random.choice(plt.colormaps())
+  cmap = plt.get_cmap(randcmapname)
+  randcmapcolor = cmap(random.random())
+  return randcmapcolor
+def plotter2par(measx,measy,x,y):
+  plt.plot(measx,measy, color=randcolor())
+  plt.xlabel(x)
+  plt.ylabel(y)
+  plt.show()
+time=[]
+gtemp=[]
+ctemp=[]
+gutil=[]
+cutil=[]
+gmem=[]
+cmem=[]
+
+file_path = 'measurments.log'
+#can be local (path) and for gdrive this can be ignored
+try:
+  with open(file_path, 'r') as f:
+            for line in f:
+                if line.startswith("Time(s)"):
+                    break
+            for line in f:
+                if not line or line.startswith("End time:"):
+                    break
+                #print(line.strip())
+                lis=line.split()
+                time.append(lis[0])
+                ctemp.append(lis[1])
+                gtemp.append(lis[2])
+                gutil.append(lis[3])
+                gmem.append(lis[4])
+                cutil.append(lis[5]) #add in bash
+                cmem.append(lis[6]) #add in bash
+                
+  plotter2par(time, ctemp,'time','cpu_util')
+  plotter2par(time,gtemp,'time','gpu_util')
+  plotter2par(time, ctemp,'time','cpu_temp')
+  plotter2par(time,gtemp,'time','gpu_temp')
+  plotter2par(gutil,gtemp,'gpu_util','gpu_temp')
+  plotter2par(cutil,ctemp,'cpu_util','cpu_temp')
+  plotter2par(gtemp,gmem,'gpu_temp','gpu_mem')
+  plotter2par(ctemp,cmem,'cpu_temp','cpu_mem')
+  plotter2par(gutil,gmem,'gpu_util','gpu_mem')
+  plotter2par(cutil,cmem,'cpu_util','cpu_mem')
+
+except FileNotFoundError:
+  print(f"Error: The file '{file_path}' was not found.")
+except Exception as e:
+  print(f"An error occurred: {e}")
