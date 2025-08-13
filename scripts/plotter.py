@@ -37,17 +37,9 @@ file_path = '/content/measurments.log.txt'
 #can be local (path) and for gdrive this can be ignored
 try:
   with open(file_path, 'r') as f:
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
-            next(f)
+            for line in f:
+                if line.startswith("Time(s)"):
+                    break
             for line in f:
                 if not line or line.startswith("End time:"):
                     break
