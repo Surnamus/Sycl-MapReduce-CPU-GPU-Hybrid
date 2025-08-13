@@ -42,8 +42,16 @@ try:
             next(f)
             next(f)
             next(f)
+            next(f)
+            next(f)
+            next(f)
+            next(f)
+            next(f)
+            next(f)
             for line in f:
-                print(line.strip())
+                if not line or line.startswith("End time:"):
+                    break
+                #print(line.strip())
                 lis=line.split()
                 time.append(lis[0])
                 ctemp.append(lis[1])
@@ -52,7 +60,7 @@ try:
                 gmem.append(lis[4])
                 cutil.append(lis[5]) #add in bash
                 cmem.append(lis[6]) #add in bash
-
+                
   plotter2par(time, ctemp,'time','cpu_util')
   plotter2par(time,gtemp,'time','gpu_util')
   plotter2par(time, ctemp,'time','cpu_temp')
