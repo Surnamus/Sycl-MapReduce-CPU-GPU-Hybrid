@@ -6,29 +6,17 @@
 #include "GPU.h"
 
 namespace sycl = cl::sycl;
-char** convert(std::vector<std::string> working_data){
-        char** cstrings = (char**)malloc(working_data.size() * sizeof(char*));
-    if (!cstrings) return nullptr;
+std::pair<std::string,std::vector<size_t>> convert(std::vector<std::string> strings){
+        std::vector<size_t> offsets;
+std::string flattened;
 
-    for (size_t i = 0; i < working_data.size(); ++i) {
-        cstrings[i] = (char*)malloc(working_data[i].size() + 1);
-        if (!cstrings[i]) {
-            for (size_t j = 0; j < i; ++j) {
-                free(cstrings[j]);
-            }
-            free(cstrings);
-            return nullptr;
-        }
-        std::strcpy(cstrings[i], working_data[i].c_str());
-    }
-    return cstrings; 
+for (const auto& s : strings) {
+    offsets.push_back(flattened.size()); 
+    flattened += s;
+    flattened += '\0'; 
 }
-void freeCharArray(char** cstrings, size_t count) {
-    if (!cstrings) return;
-    for (size_t i = 0; i < count; ++i) {
-        free(cstrings[i]);
-    }
-    free(cstrings);
+return {flattened,offsets};
+        // to convert to char* = std::string:c_str(flattened)
 }
 int main() {
    
@@ -39,22 +27,26 @@ int main() {
     std::tuple<sycl::device,int> dev = Program_device_selector();
 
     sycl::queue q{std::get<0>(dev)};
+   
+    std::pair<std::string,std::vector<size_t>> datadev = convert(dataset_used);
+        char* flat_data = sycl::malloc_shared<char>(datadev.first.size(), q);
+        std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1); 
+        int k=3;
+
 
     std::cout << "Running on "
               << q.get_device().get_info<sycl::info::device::name>()<<"\n" ; 
         
      if ( std::get<1>(dev)==1){
-            //cpu
+      //here it can be used to change device selectors gpu
      }
      else if ( std::get<2>(dev)==2){
-        char ** datadev = convert(dataset_used);
-        int k=3;
-        Map mapk(datadev, 512,q);
-        
-        mapk.runkernel();
+      
+            //here it can be used to change device selectors cpu
+
 
      }else{
-        //hib
+      //here it can be used to change device selectors hybrid
      }        
    //ako je gpu onda gpu header
    //analogno za cpu i hibrid
