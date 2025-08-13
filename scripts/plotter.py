@@ -38,6 +38,10 @@ file_path = '/content/measurments.log.txt'
 try:
   with open(file_path, 'r') as f:
             next(f)
+            next(f)
+            next(f)
+            next(f)
+            next(f)
             for line in f:
                 print(line.strip())
                 lis=line.split()
