@@ -10,13 +10,14 @@
 #include <tuple>
 #include <cstdlib> 
 //TODO: definiisati sve potrene funkcije i videti jel kernel moze da se napise na ikakav nacin bez lambde
+namespace GPU{
 struct Map {
-    char** data;
+    char* data;
     std::size_t N;
-    sycl::queue& q;
-
-    Map(char** _data, std::size_t _N, sycl::queue& _q)
-      : data(_data), N(_N), q(_q) {}
+    sycl::queue q;
+    int k;
+    Map(char* _data, std::size_t _N, const sycl::queue& _q, int _k)
+      : data(_data), N(_N), q(_q), k(_k) {}
 
     void operator()(sycl::nd_item<1> it) const;
     void runkernel() const;
@@ -24,11 +25,11 @@ struct Map {
 };
 //struct Combine;
 struct Reduce{
-      char** data;
+      char* data;
     std::size_t N;
     sycl::queue& q;
 
-    Reduce(char** _data, std::size_t _N, sycl::queue& _q)
+    Reduce(char* _data, std::size_t _N, sycl::queue& _q)
       : data(_data), N(_N), q(_q) {}
 
     void operator()(sycl::nd_item<1> it) const;
@@ -36,4 +37,6 @@ struct Reduce{
     ~Reduce();
 
 };
+
+}
 #endif

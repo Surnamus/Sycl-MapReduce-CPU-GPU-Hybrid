@@ -15,14 +15,14 @@
 #include <tuple>
 #include <cstdlib> 
 namespace sycl = cl::sycl;
-
+namespace CPU{
 struct Map {
     char* data;
     std::size_t N;
-    sycl::queue& q;
-
-    Map(char* _data, std::size_t _N, sycl::queue& _q)
-      : data(_data), N(_N), q(_q) {}
+    sycl::queue q;
+    int k;
+    Map(char* _data, std::size_t _N, const sycl::queue& _q, int _k)
+      : data(_data), N(_N), q(_q), k(_k) {}
 
     void operator()(sycl::nd_item<1> it) const;
     void runkernel() const;
@@ -42,5 +42,5 @@ struct Reduce{
     ~Reduce();
 
 };
-
+}
 #endif

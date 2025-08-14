@@ -44,12 +44,12 @@ struct Mapped{
 struct Map {
     char* data;
     std::size_t N;        
-    sycl::queue& q;
+    sycl::queue q;
     int k;
 
     Mapped* mappedw;      
 
-    Map(char* _data, std::size_t _N, sycl::queue& _q, int _k)
+    Map(char* _data, size_t _N, const hipsycl::sycl::queue& _q, int _k)
         : data(_data), N(_N), q(_q), k(_k) {
         mappedw = sycl::malloc_shared<Mapped>(N > k ? N - k + 1 : 1, q);
     }
@@ -75,7 +75,7 @@ struct Map {
         mappedw[gid].v = 1;
     }
 
-    void runkernel() const {
+    void runkernel()  {
         size_t local_size = 256;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -95,7 +95,7 @@ struct Reduce {
     size_t N;
     sycl::queue& q;
 
-    Reduce(Mapped* _mappedw, size_t _N, sycl::queue& _q)
+    Reduce(Mapped* _mappedw, size_t _N,  hipsycl::sycl::queue& _q)
         : mappedw(_mappedw), N(_N), q(_q) {}
 
     void operator()(sycl::nd_item<1> it,
