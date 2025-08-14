@@ -1,0 +1,90 @@
+Start time: Thu Aug 14 11:37:41 AM UTC 2025
+
+CPU (start):
+
+GPU (start):
+58, 22.29, 3, 0, 6138
+
+Running ./main...
+
+Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)
+
+End time: Thu Aug 14 11:37:43 AM UTC 2025
+execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+58, 22.22, 3, 0, 6138
+Start time: Thu Aug 14 11:38:48 AM UTC 2025
+
+CPU (start):
+
+GPU (start):
+58, 22.13, 3, 0, 6138
+
+Running ./main...
+
+Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)
+
+End time: Thu Aug 14 11:38:49 AM UTC 2025
+execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+58, 22.30, 3, 0, 6138
+Start time: Thu Aug 14 11:39:48 AM UTC 2025
+
+CPU (start):
+
+GPU (start):
+58, 22.05, 4, 0, 6138
+
+Running ./main...
+
+Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)
+
+End time: Thu Aug 14 11:39:50 AM UTC 2025
+execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+58, 22.03, 3, 0, 6138
+Start time: Thu Aug 14 11:42:29 AM UTC 2025
+
+CPU (start):
+
+GPU (start):
+57, 21.81, 3, 0, 6138
+
+Running ./main...
+
+Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)
+
+End time: Thu Aug 14 11:42:31 AM UTC 2025
+execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+57, 21.98, 4, 0, 6138
+Start time: Thu Aug 14 01:42:34 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+56, 21.55, 3, 0, 6138
+
+Running ./main...
+
+Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)
+
+End time: Thu Aug 14 01:42:36 PM UTC 2025
+execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+56, 21.62, 3, 0, 6138

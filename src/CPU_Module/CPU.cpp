@@ -24,6 +24,7 @@
 #include <ctime>
 int constexpr MAXK=4;
 namespace sycl = cl::sycl;
+
 struct Mapped{
   char word[MAXK+1];
   int v;
@@ -44,17 +45,17 @@ struct Mapped{
 struct Map {
     char* data;
     std::size_t N;        
-    sycl::queue q;
+    //sycl::queue& q;
     int k;
 
     Mapped* mappedw;      
 
-    Map(char* _data, size_t _N, const hipsycl::sycl::queue& _q, int _k)
-        : data(_data), N(_N), q(_q), k(_k) {
-        mappedw = sycl::malloc_shared<Mapped>(N > k ? N - k + 1 : 1, q);
+    Map(char* _data, std::size_t _N, int _k)
+        : data(_data), N(_N), k(_k) {
+      //  mappedw = sycl::malloc_shared<Mapped>(N > k ? N - k + 1 : 1, q); in main
     }
 
-    void operator()(sycl::nd_item<1> it) {
+    void operator()(sycl::nd_item<1> it) const  {
         size_t gid = it.get_global_id(0);
         if (gid > N - k) return;  
 
@@ -75,7 +76,7 @@ struct Map {
         mappedw[gid].v = 1;
     }
 
-    void runkernel()  {
+    void runkernel(sycl::queue q) const {
         size_t local_size = 256;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -85,18 +86,16 @@ struct Map {
         }).wait();
     }
 
-    ~Map() {
-        sycl::free(mappedw, q);
-    }
+   
 };
 
 struct Reduce {
     Mapped* mappedw;  // instead of char* data and offsets
     size_t N;
-    sycl::queue& q;
+   // sycl::queue& q;
 
-    Reduce(Mapped* _mappedw, size_t _N,  hipsycl::sycl::queue& _q)
-        : mappedw(_mappedw), N(_N), q(_q) {}
+    Reduce(Mapped* _mappedw, size_t _N)
+        : mappedw(_mappedw), N(_N) {}
 
     void operator()(sycl::nd_item<1> it,
                     sycl::local_accessor<int, 1> shared,
@@ -134,7 +133,7 @@ struct Reduce {
         }
     }
 
-    void runkernel(int* result) const {
+    void runkernel(int* result,sycl::queue q) const {
         size_t local_size = 256;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -149,9 +148,7 @@ struct Reduce {
         }).wait();
     }
 
-    ~Reduce() {
-        sycl::free(mappedw, q);
-    }
+    
 };
 
 //fix the structure a bit

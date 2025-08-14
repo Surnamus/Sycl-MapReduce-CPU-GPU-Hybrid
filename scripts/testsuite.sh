@@ -17,7 +17,7 @@ echo | tee -a "$LOGFILE"
 echo "Running ./main..." | tee -a "$LOGFILE"
 start=$(date +%s)
 
-./main &
+./src/main &
 PID=$!
 
 echo | tee -a "$LOGFILE"

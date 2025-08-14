@@ -41,12 +41,12 @@ int main() {
      if ( std::get<1>(dev)==1){
       //here it can be used to change device selectors gpu
      size_t N=datadev.first.size();
-      CPU::Map(flat_data,N,q,k);
+      CPU::Map(flat_data,N,k);
      
      }
-     else if ( std::get<2>(dev)==2){
-             size_t N=datadev.first.size();
-            GPU::Map(flat_data,N,q,k);
+     else if ( std::get<1>(dev)==2){
+            size_t N=datadev.first.size();
+            GPU::Map(flat_data,N,k);
 
             //here it can be used to change device selectors cpu
 

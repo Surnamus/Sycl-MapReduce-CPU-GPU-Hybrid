@@ -11,32 +11,50 @@
 #include <cstdlib> 
 //TODO: definiisati sve potrene funkcije i videti jel kernel moze da se napise na ikakav nacin bez lambde
 namespace GPU{
+  int constexpr MAXK=4; //
+  struct Mapped{
+  char word[MAXK+1];
+  int v;
+   Mapped operator+(const Mapped& other) const {
+       // rewrite so that its device valid
+
+        Mapped m;
+        //strcpy(m.word, word);
+        for ( int i=0; i<sizeof(word) / sizeof(char*) ; i++){
+          m.word[i]=word[i];
+        }
+        m.v = v + other.v;
+        return m;
+    }
+}; //
 struct Map {
     char* data;
     std::size_t N;
-    sycl::queue q;
+   // sycl::queue q;
+    Mapped* mappedw;   //
     int k;
-    Map(char* _data, std::size_t _N, const sycl::queue& _q, int _k)
-      : data(_data), N(_N), q(_q), k(_k) {}
+    Map(char* _data, std::size_t _N, int _k)
+      : data(_data), N(_N), k(_k) {}
 
     void operator()(sycl::nd_item<1> it) const;
-    void runkernel() const;
-    ~Map();
+    void runkernel(sycl::queue& _q) const;
+    //~Map();
 };
 //struct Combine;
 struct Reduce{
       char* data;
     std::size_t N;
-    sycl::queue& q;
+    //sycl::queue& q;
 
-    Reduce(char* _data, std::size_t _N, sycl::queue& _q)
-      : data(_data), N(_N), q(_q) {}
+    Reduce(char* _data, std::size_t _N)
+      : data(_data), N(_N) {}
 
     void operator()(sycl::nd_item<1> it) const;
-    void runkernel() const;
-    ~Reduce();
+    void runkernel(sycl::queue& _q) const;
+   // ~Reduce();
 
 };
 
-}
+
 #endif
+}

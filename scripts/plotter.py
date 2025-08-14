@@ -21,7 +21,7 @@ cutil=[]
 gmem=[]
 cmem=[]
 
-file_path = 'measurments.log'
+file_path = 'measurements.log'
 #can be local (path) and for gdrive this can be ignored
 try:
   with open(file_path, 'r') as f:
