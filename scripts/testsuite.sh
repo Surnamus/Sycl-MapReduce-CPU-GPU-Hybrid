@@ -1,54 +1,74 @@
 #!/bin/bash
 
 LOGFILE="measurements.log"
-INTERVAL=0.1
+INTERVAL=1
 
-echo "Start time: $(date)" | tee -a "$LOGFILE"
+echo "Start time: $(date)" >> "$LOGFILE"
 
-echo | tee -a "$LOGFILE"
-echo "CPU (start):" | tee -a "$LOGFILE"
-sensors | grep -E 'Core|Package' | tee -a "$LOGFILE"
+echo >> "$LOGFILE"
+echo "CPU (start):" >> "$LOGFILE"
+sensors | grep -E 'Core|Package' >> "$LOGFILE"
 
-echo | tee -a "$LOGFILE"
-echo "GPU (start):" | tee -a "$LOGFILE"
-nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits | tee -a "$LOGFILE"
+echo >> "$LOGFILE"
+echo "GPU (start):" >> "$LOGFILE"
+nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used \
+    --format=csv,noheader,nounits | tr -d ',' >> "$LOGFILE"
 
-echo | tee -a "$LOGFILE"
-echo "Running ./main..." | tee -a "$LOGFILE"
+echo >> "$LOGFILE"
+echo "Running ./main..." >> "$LOGFILE"
 start=$(date +%s)
 
-./src/main &
-PID=$!
+./src/main & PID=$!
 
-echo | tee -a "$LOGFILE"
-echo "Time(s)  CPU_Temp(°C)  GPU_Temp(°C)  GPU_Util(%)  GPU_Mem(MB/MB)" | tee -a "$LOGFILE"
+while [ ! -f start_measure ]; do
+    sleep 0.05
+done
+rm -f start_measure
+echo >> "$LOGFILE"
+echo "Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem" >> "$LOGFILE"
 
 while kill -0 "$PID" 2>/dev/null; do
     now=$(( $(date +%s) - start ))
 
-    cpu_temp=$(sensors | awk '/Package id 0/ {print $4}' | tr -d '+°C')
+    cpu_temp=$(sensors | awk '/Package id 0/ {gsub("\\+|°C","",$4); print $4}')
+    cpu_temp=${cpu_temp:-0}
 
-    read -r gpu_temp gpu_power gpu_util gpu_mem_used gpu_mem_total <<< \
-        $(nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used,memory.total \
-            --format=csv,noheader,nounits)
+    gpu_stats=$(nvidia-smi --query-gpu=temperature.gpu,utilization.gpu,memory.used \
+        --format=csv,noheader,nounits 2>/dev/null | tr -d ',' | grep -E '^[0-9]')
+    if [[ -n "$gpu_stats" ]]; then
+        read -r gpu_temp gpu_util gpu_mem_used <<< "$gpu_stats"
+    else
+        gpu_temp=0
+        gpu_util=0
+        gpu_mem_used=0
+    fi
 
-    printf "%7s  %12s  %12s  %9s  %7s/%s\n" \
-        "$now" "$cpu_temp" "$gpu_temp" "$gpu_util" "$gpu_mem_used" "$gpu_mem_total" | tee -a "$LOGFILE"
+    # CPU utilization
+    cpu_util=$(top -bn1 | awk '/Cpu\(s\)/ {print 100 - $8}')
+    cpu_util=${cpu_util:-0}
+
+    # Memory usage
+    mem_used=$(free -m | awk '/Mem:/ {print $3}')
+    mem_used=${mem_used:-0}
+
+    printf "%d %s %s %s %s %.1f %s\n" \
+        "$now" "$cpu_temp" "$gpu_temp" "$gpu_util" "$gpu_mem_used" "$cpu_util" "$mem_used" \
+        >> "$LOGFILE"
 
     sleep "$INTERVAL"
 done
 
 end=$(date +%s)
 
-echo | tee -a "$LOGFILE"
-echo "End time: $(date)" | tee -a "$LOGFILE"
-echo "execution time: $((end - start)) seconds" | tee -a "$LOGFILE"
+echo >> "$LOGFILE"
+echo "End time: $(date)" >> "$LOGFILE"
+echo "Execution time: $((end - start)) seconds" >> "$LOGFILE"
 
-echo | tee -a "$LOGFILE"
-echo "CPU (end):" | tee -a "$LOGFILE"
-sensors | grep -E 'Core|Package' | tee -a "$LOGFILE"
+echo >> "$LOGFILE"
+echo "CPU (end):" >> "$LOGFILE"
+sensors | grep -E 'Core|Package' >> "$LOGFILE"
 
-echo | tee -a "$LOGFILE"
-echo "GPU (end):" | tee -a "$LOGFILE"
-nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits | tee -a "$LOGFILE"
-
+echo >> "$LOGFILE"
+echo "GPU (end):" >> "$LOGFILE"
+nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used \
+    --format=csv,noheader,nounits | tr -d ',' >> "$LOGFILE"

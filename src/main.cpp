@@ -5,8 +5,13 @@
 #include "helper.h"
 #include "GPU.h"
 #include "CPU.h"
-
+#include <fstream>
 namespace sycl = cl::sycl;
+void run(){
+    std::ofstream f("start_measure");
+    f << "go\n";
+    f.close();
+}
 std::pair<std::string,std::vector<size_t>> convert(std::vector<std::string> strings){
         std::vector<size_t> offsets;
 std::string flattened;
@@ -40,18 +45,21 @@ int main() {
         
      if ( std::get<1>(dev)==1){
       //here it can be used to change device selectors gpu
-     size_t N=datadev.first.size();
-      CPU::Map(flat_data,N,k);
-     
+        size_t N=datadev.first.size();
+        run();
+
+     // CPU::Map(flat_data,N,k);
      }
      else if ( std::get<1>(dev)==2){
             size_t N=datadev.first.size();
-            GPU::Map(flat_data,N,k);
-
+            run();
+          //  GPU::Map(flat_data,N,k);
+        
             //here it can be used to change device selectors cpu
 
 
      }else{
+        run();
       //here it can be used to change device selectors hybrid
      }        
    //ako je gpu onda gpu header

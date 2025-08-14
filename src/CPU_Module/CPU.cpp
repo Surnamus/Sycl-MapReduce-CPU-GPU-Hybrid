@@ -33,7 +33,7 @@ struct Mapped{
 
         Mapped m;
         //strcpy(m.word, word);
-        for ( int i=0; i<sizeof(word) / sizeof(char*) ; i++){
+        for ( int i=0; i<MAXK+1 ; i++){
           m.word[i]=word[i];
         }
         m.v = v + other.v;
@@ -77,7 +77,7 @@ struct Map {
     }
 
     void runkernel(sycl::queue q) const {
-        size_t local_size = 256;
+        size_t local_size = 512;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
@@ -106,13 +106,13 @@ struct Reduce {
         size_t lid = it.get_local_id(0);
 
         int v = 0;
-        if (gid < N) {
+      /*  if (gid < N) {
             const char* kmer = mappedw[gid].word;
             int len = 0;
             while (kmer[len] != '\0') len++;
             v = len;
-        }
-
+        }*/
+        int v = (gid < N) ? mappedw[gid].v : 0;
         shared[lid] = v;
         it.barrier(sycl::access::fence_space::local_space);
 

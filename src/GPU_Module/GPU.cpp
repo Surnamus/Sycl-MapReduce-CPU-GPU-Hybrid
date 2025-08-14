@@ -33,12 +33,13 @@ struct Mapped{
 
         Mapped m;
         //strcpy(m.word, word);
-        for ( int i=0; i<sizeof(word) / sizeof(char*) ; i++){
+                for ( int i=0; i<MAXK+1 ; i++){
           m.word[i]=word[i];
         }
         m.v = v + other.v;
         return m;
     }
+
 };
 
 //usm
@@ -106,12 +107,13 @@ struct Reduce {
         size_t lid = it.get_local_id(0);
 
         int v = 0;
-        if (gid < N) {
+              /*  if (gid < N) {
             const char* kmer = mappedw[gid].word;
             int len = 0;
             while (kmer[len] != '\0') len++;
             v = len;
-        }
+        }*/
+        int v = (gid < N) ? mappedw[gid].v : 0;
 
         shared[lid] = v;
         it.barrier(sycl::access::fence_space::local_space);

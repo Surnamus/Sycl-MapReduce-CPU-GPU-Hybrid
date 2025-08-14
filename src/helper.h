@@ -12,5 +12,4 @@ std::vector<std::string> prepare();
 void init();
 std::vector<std::string> dataset_selector(std::vector<std::string> data);
 std::tuple<sycl::device,int> Program_device_selector();
-// dodati funkcije za merenja odredjenih parametra ( memorija, temperatura, vreme , efikasnost svega otp)
 #endif
