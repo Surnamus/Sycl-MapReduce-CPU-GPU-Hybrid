@@ -34,6 +34,8 @@ int main() {
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
     std::vector<std::string> dataset_used = dataset_selector(datav);
+    std::cin.clear(); // clear fail and eof flags
+std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // discard leftover input
     std::tuple<sycl::device, int> dev = Program_device_selector();
     
     // Fixed: removed hipsycl namespace, using standard sycl
@@ -49,7 +51,8 @@ int main() {
               << q.get_device().get_info<sycl::info::device::name>() << "\n";
     
     size_t N = datadev.first.size();
-    GPU::Mapped* mappedwm = sycl::malloc_shared<GPU::Mapped>(N > k ? N - k + 1 : 1, q);
+    size_t mapped_size = (N > k) ? (N - k + 1) : 1;
+    GPU::Mapped* mappedwm = sycl::malloc_shared<GPU::Mapped>(mapped_size, q);
     int* result = sycl::malloc_shared<int>(1, q); // Allocate result memory
     *result = 0; // Initialize result
     

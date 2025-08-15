@@ -66,19 +66,38 @@ Reduce::Reduce(Mapped* _mappedw, std::size_t _N)
 void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
-    constexpr int blocksize = 512;
-
     size_t gid = it.get_global_id(0);
-    size_t lid = it.get_local_id(0);
 
+    // Each thread checks if it is a duplicate of the previous
+    if (gid > 0 && gid < N) {
+        bool same = true;
+        for (int j = 0; j < MAXK; ++j) {
+            if (mappedw[gid].word[j] != mappedw[gid - 1].word[j]) {
+                same = false;
+                break;
+            }
+            if (mappedw[gid].word[j] == '\0') break;
+        }
+
+        if (same) {
+            // Add v to first occurrence
+            sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> afr(mappedw[gid - 1].v);
+            afr.fetch_add(mappedw[gid].v);
+            mappedw[gid].v = 0; // zero out duplicate
+        }
+    }
+
+    constexpr int blocksize = 512;
+    size_t lid = it.get_local_id(0);
     int v = (gid < N) ? mappedw[gid].v : 0;
     shared[lid] = v;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
-        if (lid < s) {
-            shared[lid] += shared[lid + s];
-        }
+        if (lid < s) shared[lid] += shared[lid + s];
         it.barrier(sycl::access::fence_space::local_space);
     }
 
@@ -86,8 +105,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
         sycl::atomic_ref<int,
             sycl::memory_order::relaxed,
             sycl::memory_scope::device,
-            sycl::access::address_space::global_space>
-            afr(result[0]);
+            sycl::access::address_space::global_space> afr(result[0]);
         afr.fetch_add(shared[0]);
     }
 }
@@ -108,7 +126,7 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
 }
 
 void Reduce::radixsort(sycl::queue &q, size_t k) const {
-    Mapped* mapped_ptr = mappedw;
+    Mapped* pointer = mappedw;
     size_t NN = N;
 
     Mapped* tmp = sycl::malloc_shared<Mapped>(NN, q);
@@ -125,7 +143,7 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
             h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
                 if (i < NN) {
-                    char c = mapped_ptr[i].word[pos];
+                    char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
                               (c == 'G') ? 2 : 3;
@@ -151,7 +169,7 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
             h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
                 if (i < NN) {
-                    char c = mapped_ptr[i].word[pos];
+                    char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
                               (c == 'G') ? 2 : 3;
@@ -161,12 +179,12 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
                         sycl::access::address_space::global_space>
                         afr(prefix[val]);
                     int idx = afr.fetch_add(1);
-                    tmp[idx] = mapped_ptr[i]; 
+                    tmp[idx] = pointer[i]; 
                 }
             });
         }).wait();
 
-        q.memcpy(mapped_ptr, tmp, NN * sizeof(Mapped)).wait();
+        q.memcpy(pointer, tmp, NN * sizeof(Mapped)).wait();
 
         sycl::free(counts, q);
         sycl::free(prefix, q);

@@ -43,13 +43,11 @@ void init(){
 
     int status;
 
-    // Run the unzip script
     status = std::system("~/project/scripts/decompressor.sh");
     if (status != 0) {
         std::cerr << "Error running decompressor.sh\n";
     }
 
-    // Run the .fna → .txt processor script
     status = std::system("~/project/scripts/modifier.sh");
     if (status != 0) {
         std::cerr << "Error running modifier.sh\n";
@@ -58,80 +56,67 @@ void init(){
 }
 
 
-std::vector<std::string> dataset_selector(std::vector<std::string> data) {
-   std::cout << "Dataset size is " << data.size()
-              << ". Enter one index per line. Type -1 to finish.\n\n";
-    
+std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
+    std::cout << "Dataset size is " << data.size()
+              << ". Enter indices one per line (0 to " << data.size()-1 
+              << "), type -1 to finish. Press Enter to skip and use full dataset.\n";
+
     std::vector<std::string> selected_data;
     std::string line;
-    
+
     while (true) {
         std::cout << "Enter index: ";
-        
-        if (!std::getline(std::cin, line)) {
-            // Handle EOF or input stream error
-            std::cout << "\nInput stream closed. Returning selected data.\n";
-            break;
+        if (!std::getline(std::cin, line) || line.empty()) {
+            std::cout << "No input provided. Using full dataset.\n";
+            return data; // safe fallback
         }
-        
-        // Skip empty lines
-        if (line.empty()) {
-            continue;
-        }
-        
-        // Try to parse the line as an integer
-        std::istringstream iss(line);
-        int u;
-        
-        if (!(iss >> u) || !iss.eof()) {
-            // Handle invalid input (not a single integer)
-            std::cout << "Invalid input. Please enter a single number.\n";
-            continue;
-        }
-        
-        if (u == -1) {
-            std::cout << "Finished. Selected dataset size is "
-                      << selected_data.size() << "\n";
-            break;
-        }
-        
-        if (u >= 0 && u < static_cast<int>(data.size())) {
-            selected_data.push_back(data[u]);
-            std::cout << "Added: \"" << data[u] << "\"\n";
-        } else {
-            std::cout << "Index " << u << " is out of bounds. Dataset size is " 
-                      << data.size() << "\n";
+
+        try {
+            long long idx = std::stoll(line);
+            if (idx == -1) break; // finished
+            if (idx >= 0 && idx < static_cast<long long>(data.size())) {
+                selected_data.push_back(data[idx]);
+                std::cout << "Added: \"" << data[idx] << "\"\n";
+            } else {
+                std::cout << "Index out of bounds, ignoring.\n";
+            }
+        } catch (...) {
+            std::cout << "Invalid input, ignoring. Using full dataset if nothing selected.\n";
         }
     }
-    
+
+    if (selected_data.empty()) {
+        std::cout << "No valid indices entered. Using full dataset.\n";
+        return data; // safe fallback
+    }
+
     return selected_data;
 }
 
-std::tuple<sycl::device,int> Program_device_selector(){
-    int n;
-    std::cout<<"1-CPU, 2-GPU, 3-Hybrid ";
-    //ne treba exeption jer znamo da se radi o cpu i gpu sistemu gde su oba dostupna
-   while (true){
-    std::cin>>n;
+//--- Device selector with optional input and safe fallback
+std::tuple<sycl::device, int> Program_device_selector() {
+    std::cout << "\nSelect device:\n"
+              << "1 - GPU\n2 - CPU\n3 - Hybrid (GPU map + CPU reduce)\n"
+              << "Press Enter to use default (CPU).\n";
 
-      if (n==1){      sycl::device dev =sycl::device(sycl::cpu_selector_v);
-            return {dev,n};
-        
-      }
-    else if ( n==2){        sycl::device dev =sycl::device(sycl::gpu_selector_v);
-            return {dev,n};
+    std::string line;
+    if (!std::getline(std::cin, line) || line.empty()) {
+        std::cout << "No input provided. Using CPU by default.\n";
+        return {sycl::device(sycl::cpu_selector_v), 2};
     }
-      else if (n==3){      sycl::device dev =sycl::device(sycl::gpu_selector_v);
-        //yvati header 
-            return {dev,n};  
-      }
-        else{ std::cout<<"Not a valid number"<<"\n";
-            std::cout<<"Select a number from 1 to 3"<<"\n";
 
+    try {
+        int choice = std::stoi(line);
+        switch (choice) {
+            case 1: return {sycl::device(sycl::gpu_selector_v), 1};
+            case 2: return {sycl::device(sycl::cpu_selector_v), 2};
+            case 3: return {sycl::device(sycl::gpu_selector_v), 3};
+            default:
+                std::cout << "Invalid choice. Using CPU by default.\n";
+                return {sycl::device(sycl::cpu_selector_v), 1};
         }
-        }
-        sycl::device dev =sycl::device(sycl::default_selector_v);
-        //yvati header 
-            return {dev,n}; 
-        
+    } catch (...) {
+        std::cout << "Invalid input. Using CPU by default.\n";
+        return {sycl::device(sycl::cpu_selector_v), 1};
     }
+}

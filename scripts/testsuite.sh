@@ -18,7 +18,7 @@ echo >> "$LOGFILE"
 echo "Running ./main..." >> "$LOGFILE"
 start=$(date +%s)
 
-./src/main & PID=$!
+/home/user/project/build/project & PID=$!
 
 while [ ! -f start_measure ]; do
     sleep 0.05

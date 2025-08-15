@@ -10,6 +10,6 @@
 namespace sycl = cl::sycl;
 std::vector<std::string> prepare();
 void init();
-std::vector<std::string> dataset_selector(std::vector<std::string> data);
+std::vector<std::string> dataset_selector(std::vector<std::string>& data);
 std::tuple<sycl::device,int> Program_device_selector();
 #endif

@@ -60,7 +60,7 @@ void Map::operator()(sycl::nd_item<1> it) const {
 }
 
 void Map::runkernel(sycl::queue& q) const {
-    size_t local_size = 512;
+    size_t local_size = 4;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
 
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -85,19 +85,39 @@ bool Reduce::lex_compare(const Mapped &a, const Mapped &b) {
 void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
-    constexpr int blocksize = 512;
-
     size_t gid = it.get_global_id(0);
-    size_t lid = it.get_local_id(0);
 
+    // Per-unique counting
+    if (gid > 0 && gid < N) {
+        bool same_as_prev = true;
+        for (int j = 0; j < MAXK; ++j) {
+            if (mappedw[gid].word[j] != mappedw[gid - 1].word[j]) {
+                same_as_prev = false;
+                break;
+            }
+            if (mappedw[gid].word[j] == '\0') break;
+        }
+
+        if (same_as_prev) {
+            // Add v to first occurrence
+            sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device, // on CPU this is host memory
+                sycl::access::address_space::global_space> afr(mappedw[gid - 1].v);
+            afr.fetch_add(mappedw[gid].v);
+            mappedw[gid].v = 0; // zero out duplicate
+        }
+    }
+
+    // Block-wise reduction (optional, total sum)
+    constexpr int blocksize = 512;
+    size_t lid = it.get_local_id(0);
     int v = (gid < N) ? mappedw[gid].v : 0;
     shared[lid] = v;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
-        if (lid < s) {
-            shared[lid] += shared[lid + s];
-        }
+        if (lid < s) shared[lid] += shared[lid + s];
         it.barrier(sycl::access::fence_space::local_space);
     }
 
@@ -105,8 +125,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
         sycl::atomic_ref<int,
             sycl::memory_order::relaxed,
             sycl::memory_scope::device,
-            sycl::access::address_space::global_space>
-            afr(result[0]);
+            sycl::access::address_space::global_space> afr(result[0]);
         afr.fetch_add(shared[0]);
     }
 }
@@ -114,7 +133,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
 void Reduce::runkernel(int* result, sycl::queue& q) const {
     std::sort(std::execution::par, mappedw, mappedw + N, lex_compare);
 
-    size_t local_size = 256;
+    size_t local_size = 4;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
