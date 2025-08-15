@@ -57,7 +57,8 @@ void init(){
 
 }
 std::vector<std::string> dataset_selector(std::vector<std::string> data) {
-    std::cout<<"Dataset size is " << data.size()<<"." << " Type the number -1 if you wish to abort the input.";
+    std::cout<<"Dataset size is " << data.size()<<"." << " Type the number -1 if you wish to abort the input."<<"\n";
+    std::cout<<"\n";
 int u;
 std::vector<std::string> selected_data={};
 while (true){

@@ -30,7 +30,7 @@ std::pair<std::string, std::vector<size_t>> convert(std::vector<std::string> str
 }
 
 int main() {
-    init();
+    //init();
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
     std::vector<std::string> dataset_used = dataset_selector(datav);
@@ -58,22 +58,25 @@ int main() {
         run();
         GPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
-        
+        q.wait();
         GPU::Reduce reduce_op(map_op.mappedw, N);
         reduce_op.runkernel(result, q);
+        q.wait();
     }
     else if (std::get<1>(dev) == 2) {
         // CPU-only execution
         run();
         CPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
-        
+        q.wait();
         CPU::Reduce reduce_op(map_op.mappedw, N);
         reduce_op.runkernel(result,q);
+        q.wait();
     }
     else {
         // Hybrid execution (GPU Map + CPU Reduce)
         run();
+        sycl::queue q{sycl::gpu_selector{}};
         GPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
 
@@ -81,12 +84,13 @@ int main() {
         q.wait();
 
 // Cast GPU::Mapped* to CPU::Mapped*
+        sycl::queue cpu_q{sycl::cpu_selector{}};
         CPU::Reduce reduce_op(reinterpret_cast<CPU::Mapped*>(map_op.mappedw), N);
-        reduce_op.runkernel(result, q);    
+        reduce_op.runkernel(result, cpu_q);
+        cpu_q.wait(); 
     }
     
     // Wait for all operations to complete
-    q.wait();
     
     // Output the result
     std::cout << "Final result: " << *result << std::endl;
