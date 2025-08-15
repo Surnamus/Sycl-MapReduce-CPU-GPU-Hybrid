@@ -78,7 +78,6 @@ void Reduce::operator()(sycl::nd_item<1> it,
         }
     }
 
-    // Block-wise sum
     constexpr int blocksize = 512;
     size_t lid = it.get_local_id(0);
     shared[lid] = mappedw[gid].v;

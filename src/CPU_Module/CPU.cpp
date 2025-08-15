@@ -1,14 +1,4 @@
 
-//cpu mapreduce - 2 options
-//parralelize by threads
-//do 1 thread thingy
-//no worries abt memory bcs ram
-//it should make sense
-//do std sort :]
-//u ovom fajlu ce biti i map i reduce i combiner namenjeni za cpu, tj k mer algoritam
-//dodati sort fazu, ali to moze i kod cpu-a , tj radix i std sort odvojeno benchmarking, kakogod, to kad se bude implementirao cpu deo
-//add the references from main so such that it doesnt disrupt anything ( offswt and flattened) or just rewrite the whole thing if needed
-//fix the naming a bit logic is OK
 #include <filesystem>
 #include <CL/sycl.hpp>
 #include <fstream>
@@ -25,7 +15,6 @@
 namespace sycl = cl::sycl;
 namespace CPU {
 
-// ===== Mapped =====
 Mapped Mapped::operator+(const Mapped& other) const {
     Mapped m;
     for (int i = 0; i < MAXK + 1; i++) {
@@ -35,7 +24,6 @@ Mapped Mapped::operator+(const Mapped& other) const {
     return m;
 }
 
-// ===== Map =====
 Map::Map(char* _data, std::size_t _N, int _k)
     : data(_data), N(_N), k(_k), mappedw(nullptr) {}
 
@@ -70,7 +58,6 @@ void Map::runkernel(sycl::queue& q) const {
     }).wait();
 }
 
-// ===== Reduce =====
 Reduce::Reduce(Mapped* _mappedw, size_t _N)
     : mappedw(_mappedw), N(_N) {}
 
@@ -109,7 +96,6 @@ void Reduce::operator()(sycl::nd_item<1> it,
         }
     }
 
-    // Block-wise reduction (optional, total sum)
     constexpr int blocksize = 6;
     size_t lid = it.get_local_id(0);
     int v = (gid < N) ? mappedw[gid].v : 0;
@@ -146,7 +132,3 @@ void Reduce::runkernel(int* result, sycl::queue& q) const {
 }
 
 } // namespace CPU
-
-//fix the structure a bit
-//can use gpu code with some modifications in reduction kernel and bit in map one
-//optimize the part
