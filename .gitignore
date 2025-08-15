@@ -1,4 +1,5 @@
 .vscode/
 build/
+dataset/
 *.zip
 LICENSE
