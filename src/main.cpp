@@ -59,7 +59,7 @@ int main() {
         GPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
         
-        GPU::Reduce reduce_op(flat_data, N);
+        GPU::Reduce reduce_op(map_op.mappedw, N);
         reduce_op.runkernel(result, q);
     }
     else if (std::get<1>(dev) == 2) {
@@ -68,7 +68,7 @@ int main() {
         CPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
         
-        CPU::Reduce reduce_op(flat_data, N);
+        CPU::Reduce reduce_op(map_op.mappedw, N);
         reduce_op.runkernel(result,q);
     }
     else {
@@ -76,12 +76,13 @@ int main() {
         run();
         GPU::Map map_op(flat_data, N, k);
         map_op.runkernel(q);
-        
-        // Wait for GPU map to complete before starting CPU reduce
+
+// Wait for GPU map to complete before starting CPU reduce
         q.wait();
-        
-        CPU::Reduce reduce_op(flat_data, N);
-        reduce_op.runkernel(result,q);
+
+// Cast GPU::Mapped* to CPU::Mapped*
+        CPU::Reduce reduce_op(reinterpret_cast<CPU::Mapped*>(map_op.mappedw), N);
+        reduce_op.runkernel(result, q);    
     }
     
     // Wait for all operations to complete

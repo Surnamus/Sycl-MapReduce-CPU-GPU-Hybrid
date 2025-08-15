@@ -1,4 +1,3 @@
-
 #ifndef GPU_H
 #define GPU_H
 #include <filesystem>
@@ -9,51 +8,40 @@
 #include <vector>
 #include <tuple>
 #include <cstdlib> 
-//TODO: definiisati sve potrene funkcije i videti jel kernel moze da se napise na ikakav nacin bez lambde
+
+namespace sycl = cl::sycl;
+
 namespace GPU{
-  int constexpr MAXK=4; //
+  inline constexpr int MAXK=4; //
   struct Mapped{
-  char word[MAXK+1];
-  int v;
-   Mapped operator+(const Mapped& other) const {
-       // rewrite so that its device valid
+    char word[MAXK+1];
+    int v;
+    Mapped operator+(const Mapped& other) const;
+  }; //
 
-        Mapped m;
-        //strcpy(m.word, word);
-        for ( int i=0; i<MAXK+1 ; i++){
-          m.word[i]=word[i];
-        }
-        m.v = v + other.v;
-        return m;
-    }
-}; //
-struct Map {
-    char* data;
-    std::size_t N;
-   // sycl::queue q;
-    Mapped* mappedw;   //
-    int k;
-    Map(char* _data, std::size_t _N, int _k)
-      : data(_data), N(_N), k(_k) {}
-
-    void operator()(sycl::nd_item<1> it) const;
-    void runkernel(sycl::queue& _q) const;
-    //~Map();
-};
-//struct Combine;
-struct Reduce{
+  struct Map {
       char* data;
-    std::size_t N;
-    //sycl::queue& q;
+      std::size_t N;
+      Mapped* mappedw;   //
+      int k;
 
-    Reduce(char* _data, std::size_t _N)
-      : data(_data), N(_N) {}
+      Map(char* _data, std::size_t _N, int _k);
 
-    void operator()(sycl::nd_item<1> it) const;
-    void runkernel(int* result,sycl::queue& _q) const;
-   // ~Reduce();
+      void operator()(sycl::nd_item<1> it) const;
+      void runkernel(sycl::queue q) const;
+  };
 
-};
+  struct Reduce{
+      Mapped* mappedw;
+      std::size_t N;
 
+      Reduce(Mapped* _mappedw, std::size_t _N);
+
+      void operator()(sycl::nd_item<1> it,
+                      sycl::local_accessor<int, 1> shared,
+                      int* result) const;
+      void runkernel(int* result, sycl::queue q) const;
+      void radixsort(sycl::queue &q, size_t k) const;
+  };
 }
 #endif

@@ -9,56 +9,41 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
-#include <iostream>
 #include <string>
-#include <vector>
 #include <tuple>
 #include <cstdlib> 
+
 namespace sycl = cl::sycl;
-namespace CPU{
-  int constexpr MAXK=4; //
-  struct Mapped{
-  char word[MAXK+1];
-  int v;
-   Mapped operator+(const Mapped& other) const {
-       // rewrite so that its device valid
+namespace CPU {
+    inline constexpr int MAXK = 4;
 
-        Mapped m;
-        //strcpy(m.word, word);
-        for ( int i=0; i<MAXK+1 ; i++){
-          m.word[i]=word[i];
-        }
-        m.v = v + other.v;
-        return m;
-    }
-}; //
-struct Map {
-    char* data;
-    std::size_t N;
-   // sycl::queue q;
-    Mapped* mappedw;   //
-    int k;
-    Map(char* _data, std::size_t _N, int _k)
-      : data(_data), N(_N), k(_k) {}
+    struct Mapped {
+        char word[MAXK+1];
+        int v;
+        Mapped operator+(const Mapped& other) const;
+    };
 
-    void operator()(sycl::nd_item<1> it) const;
-    void runkernel(sycl::queue& _q) const;
-    //~Map();
-};
-//struct Combine;
-struct Reduce{
-      char* data;
-    std::size_t N;
-    //sycl::queue& q;
+    struct Map {
+        char* data;
+        std::size_t N;
+        Mapped* mappedw;
+        int k;
 
-    Reduce(char* _data, std::size_t _N)
-      : data(_data), N(_N) {}
+        Map(char* _data, std::size_t _N, int _k);
+        void operator()(sycl::nd_item<1> it) const;
+        void runkernel(sycl::queue& _q) const;
+    };
 
-    void operator()(sycl::nd_item<1> it) const;
-    void runkernel(int* result,sycl::queue& _q) const;
-   // ~Reduce();
+    struct Reduce {
+        Mapped* mappedw;
+        size_t N;
 
-};
-
+        Reduce(Mapped* _mappedw, size_t _N);
+        static bool lex_compare(const Mapped &a, const Mapped &b);
+        void operator()(sycl::nd_item<1> it,
+                        sycl::local_accessor<int, 1> shared,
+                        int* result) const;
+        void runkernel(int* result, sycl::queue& _q) const;
+    };
 }
 #endif
