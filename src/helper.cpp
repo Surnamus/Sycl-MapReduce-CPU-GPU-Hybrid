@@ -93,7 +93,6 @@ std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
     return selected_data;
 }
 
-//--- Device selector with optional input and safe fallback
 std::tuple<sycl::device, int> Program_device_selector() {
     std::cout << "\nSelect device:\n"
               << "1 - GPU\n2 - CPU\n3 - Hybrid (GPU map + CPU reduce)\n"

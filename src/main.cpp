@@ -54,35 +54,31 @@ int main() {
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
     std::tuple<sycl::device, int> dev = Program_device_selector();
-    sycl::queue q{std::get<0>(dev)}; // reserved for cases dev==1 or dev==2
+    sycl::queue q{std::get<0>(dev)}; 
 
     auto datadev = convert(dataset_used);
     int k = MAXK; // you said k == MAXK
     size_t N = datadev.first.size();
     size_t setsize = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
 
-    // allocate result using the default queue q (OK for all cases)
     int* result = sycl::malloc_shared<int>(1, q);
     *result = 0;
 
     char* flat_data = nullptr;
     GPU::Mapped* mappedwm = nullptr;
-    sycl::queue alloc_q = q; // queue used for allocations (will be updated for hybrid)
+    sycl::queue q_used = q; // queue used for allocations (will be updated for hybrid)
 
     if (std::get<1>(dev) == 1) {
-        // GPU-only: allocate with q and run on q
-        alloc_q = q;
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
+        q_used = q;
+        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
-        // initialize mappedwm...
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
         for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
-        // run GPU kernels on the same queue 'q'
         run();
         GPU::Map mapf(flat_data, N, k);
         mapf.mappedw = mappedwm;
@@ -94,12 +90,11 @@ int main() {
         q.wait();
     }
     else if (std::get<1>(dev) == 2) {
-        // CPU-only: allocate with q (cpu queue)
-        alloc_q = q;
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
+        q_used = q;
+        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
         for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
@@ -116,16 +111,14 @@ int main() {
         q.wait();
     }
     else {
-        // HYBRID: GPU map, CPU reduce
-        // allocate using gpu_q because GPU will write mappedwm
         sycl::queue gpu_q{sycl::gpu_selector{}};
         sycl::queue cpu_q{sycl::cpu_selector{}};
-        alloc_q = gpu_q; // remember we allocated with gpu_q
+        q_used = gpu_q; 
 
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
+        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
         for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
