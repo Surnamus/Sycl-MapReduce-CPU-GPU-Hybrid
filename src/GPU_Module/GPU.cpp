@@ -1,14 +1,4 @@
 
-//cpu mapreduce - 2 options
-//parralelize by threads
-//do 1 thread thingy
-//no worries abt memory bcs ram
-//it should make sense
-//do std sort :]
-//u ovom fajlu ce biti i map i reduce i combiner namenjeni za cpu, tj k mer algoritam
-//dodati sort fazu, ali to moze i kod cpu-a , tj radix i std sort odvojeno benchmarking, kakogod, to kad se bude implementirao cpu deo
-//add the references from main so such that it doesnt disrupt anything ( offswt and flattened) or just rewrite the whole thing if needed
-//fix the naming a bit logic is OK
 #include <filesystem>
 #include <CL/sycl.hpp>
 #include <fstream>
@@ -22,9 +12,11 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
-int constexpr MAXK=4;
-namespace sycl = cl::sycl;
+#include "GPU.h"
 
+namespace sycl = cl::sycl;
+namespace GPU{
+int constexpr MAXK=4;
 struct Mapped{
   char word[MAXK+1];
   int v;
@@ -43,6 +35,8 @@ struct Mapped{
 };
 
 //usm
+
+
 struct Map {
     char* data;
     std::size_t N;        
@@ -91,13 +85,13 @@ struct Map {
 };
 
 struct Reduce {
-    Mapped* mappedw;  // instead of char* data and offsets
+    Mapped* mappedw;
     size_t N;
-   // sycl::queue& q;
 
     Reduce(Mapped* _mappedw, size_t _N)
         : mappedw(_mappedw), N(_N) {}
 
+    // existing operator() and runkernel() stay untouched
     void operator()(sycl::nd_item<1> it,
                     sycl::local_accessor<int, 1> shared,
                     int* result) const {
@@ -106,15 +100,7 @@ struct Reduce {
         size_t gid = it.get_global_id(0);
         size_t lid = it.get_local_id(0);
 
-        int v = 0;
-              /*  if (gid < N) {
-            const char* kmer = mappedw[gid].word;
-            int len = 0;
-            while (kmer[len] != '\0') len++;
-            v = len;
-        }*/
         int v = (gid < N) ? mappedw[gid].v : 0;
-
         shared[lid] = v;
         it.barrier(sycl::access::fence_space::local_space);
 
@@ -135,24 +121,90 @@ struct Reduce {
         }
     }
 
-    void runkernel(int* result,sycl::queue q) const {
-        size_t local_size = 256;
+    void runkernel(int* result, sycl::queue q) const {
+        size_t local_size = 512;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
-
         
+        radixsort(q,MAXK);
 
         q.submit([&](sycl::handler& h) {
             sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
             h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
                 (*this)(it, shared, result);
+                //Reduce rcopy = *this;
             });
         }).wait();
     }
+    //sort not mine
+    void radixsort(sycl::queue &q, size_t k) const {
+    Mapped* mapped_ptr = mappedw;
+    size_t NN = N;
 
-    
+    Mapped* tmp = sycl::malloc_shared<Mapped>(NN, q);
+    constexpr int radix = 4;
+
+    for (int pos = (int)k - 1; pos >= 0; --pos) {
+        int* counts = sycl::malloc_shared<int>(radix, q);
+        int* prefix = sycl::malloc_shared<int>(radix, q);
+
+        for (int i = 0; i < radix; ++i) counts[i] = 0;
+        q.wait();
+
+       
+        q.submit([&](sycl::handler &h) {
+            h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
+                size_t i = gid[0];
+                if (i < NN) {
+                    char c = mapped_ptr[i].word[pos];
+                    int val = (c == 'A') ? 0 :
+                              (c == 'C') ? 1 :
+                              (c == 'G') ? 2 : 3;
+                    sycl::atomic_ref<int,
+                        sycl::memory_order::relaxed,
+                        sycl::memory_scope::device,
+                        sycl::access::address_space::global_space>
+                        afr(counts[val]);
+                    afr.fetch_add(1);
+                }
+            });
+        }).wait();
+
+        q.submit([&](sycl::handler &h) {
+            h.single_task([=]() {
+                prefix[0] = 0;
+                for (int r = 1; r < radix; ++r) prefix[r] = prefix[r - 1] + counts[r - 1];
+            });
+        }).wait();
+
+        q.submit([&](sycl::handler &h) {
+            h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
+                size_t i = gid[0];
+                if (i < NN) {
+                    char c = mapped_ptr[i].word[pos];
+                    int val = (c == 'A') ? 0 :
+                              (c == 'C') ? 1 :
+                              (c == 'G') ? 2 : 3;
+                    sycl::atomic_ref<int,
+                        sycl::memory_order::relaxed,
+                        sycl::memory_scope::device,
+                        sycl::access::address_space::global_space>
+                        afr(prefix[val]);
+                    int idx = afr.fetch_add(1);
+                    tmp[idx] = mapped_ptr[i]; 
+                }
+            });
+        }).wait();
+
+        q.memcpy(mapped_ptr, tmp, NN * sizeof(Mapped)).wait();
+
+        sycl::free(counts, q);
+        sycl::free(prefix, q);
+    }
+
+    sycl::free(tmp, q);
+}
 };
-
-//fix the structure a bit
+}
 //can use gpu code with some modifications in reduction kernel and bit in map one
 //optimize the part

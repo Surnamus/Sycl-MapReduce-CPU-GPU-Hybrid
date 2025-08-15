@@ -25,7 +25,7 @@ namespace CPU{
 
         Mapped m;
         //strcpy(m.word, word);
-        for ( int i=0; i<sizeof(word) / sizeof(char*) ; i++){
+        for ( int i=0; i<MAXK+1 ; i++){
           m.word[i]=word[i];
         }
         m.v = v + other.v;
@@ -55,11 +55,10 @@ struct Reduce{
       : data(_data), N(_N) {}
 
     void operator()(sycl::nd_item<1> it) const;
-    void runkernel(sycl::queue& _q) const;
+    void runkernel(int* result,sycl::queue& _q) const;
    // ~Reduce();
 
 };
 
-
-#endif
 }
+#endif

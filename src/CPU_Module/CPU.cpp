@@ -22,10 +22,13 @@
 #include <vector>
 #include <algorithm>
 #include <ctime>
-int constexpr MAXK=4;
-namespace sycl = cl::sycl;
+#include "CPU.h"
 
+namespace sycl = cl::sycl;
+namespace CPU{
+    int constexpr MAXK=4;
 struct Mapped{
+
   char word[MAXK+1];
   int v;
    Mapped operator+(const Mapped& other) const {
@@ -79,6 +82,7 @@ struct Map {
     void runkernel(sycl::queue q) const {
         size_t local_size = 512;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
+
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
         q.submit([&](sycl::handler& h) {
@@ -96,6 +100,13 @@ struct Reduce {
 
     Reduce(Mapped* _mappedw, size_t _N)
         : mappedw(_mappedw), N(_N) {}
+    static bool lex_compare(const Mapped &a, const Mapped &b) {
+        for (int i = 0; i < MAXK; ++i) {
+            if (a.word[i] != b.word[i]) return a.word[i] < b.word[i];
+            if (a.word[i] == '\0') break;
+        }
+        return false;
+    }
 
     void operator()(sycl::nd_item<1> it,
                     sycl::local_accessor<int, 1> shared,
@@ -105,7 +116,6 @@ struct Reduce {
         size_t gid = it.get_global_id(0);
         size_t lid = it.get_local_id(0);
 
-        int v = 0;
       /*  if (gid < N) {
             const char* kmer = mappedw[gid].word;
             int len = 0;
@@ -134,12 +144,14 @@ struct Reduce {
     }
 
     void runkernel(int* result,sycl::queue q) const {
+        
+        std::sort(std::execution::par, mappedw, mappedw + N, lex_compare);
+
         size_t local_size = 256;
         size_t global_size = ((N + local_size - 1) / local_size) * local_size;
         sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
         
-
         q.submit([&](sycl::handler& h) {
             sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
             h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
@@ -151,6 +163,7 @@ struct Reduce {
     
 };
 
+}
 //fix the structure a bit
 //can use gpu code with some modifications in reduction kernel and bit in map one
 //optimize the part
