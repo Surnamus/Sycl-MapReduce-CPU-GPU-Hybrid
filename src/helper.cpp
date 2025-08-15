@@ -1,9 +1,8 @@
-// uzmi podatke iz uncompresed i makni delove i predstavi ga u text
-//.fan->text
-//pozeljno da se sejva u modified
-//main cpp poziva helper i output toga se koristi za gpu, cpu, hyb
 #include <filesystem>
 #include <CL/sycl.hpp>
+#include <sstream>
+#include <string>
+#include <iostream>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -39,6 +38,7 @@ std::vector<std::string> prepare() {
 
     return file_contents;
 }
+//gpt carries the input issues
 void init(){
 
     int status;
@@ -56,26 +56,57 @@ void init(){
     }
 
 }
+
+
 std::vector<std::string> dataset_selector(std::vector<std::string> data) {
-    std::cout<<"Dataset size is " << data.size()<<"." << " Type the number -1 if you wish to abort the input."<<"\n";
-    std::cout<<"\n";
-int u;
-std::vector<std::string> selected_data={};
-while (true){
-std::cin>>u;
-if ( u < data.size() && u>=0){
-selected_data.push_back(data[u]);
-
-} else if (!(u < data.size() && u>=0) && u!=-1) {
-    std::cout<<"Selected index is out of bounds. Dataset size is " << data.size()<<"\n";
-} else if ( u==-1){
-        std::cout<<"Aborted. Selected dataset size is now " << selected_data.size()<<"\n";
-        break;
+   std::cout << "Dataset size is " << data.size()
+              << ". Enter one index per line. Type -1 to finish.\n\n";
+    
+    std::vector<std::string> selected_data;
+    std::string line;
+    
+    while (true) {
+        std::cout << "Enter index: ";
+        
+        if (!std::getline(std::cin, line)) {
+            // Handle EOF or input stream error
+            std::cout << "\nInput stream closed. Returning selected data.\n";
+            break;
+        }
+        
+        // Skip empty lines
+        if (line.empty()) {
+            continue;
+        }
+        
+        // Try to parse the line as an integer
+        std::istringstream iss(line);
+        int u;
+        
+        if (!(iss >> u) || !iss.eof()) {
+            // Handle invalid input (not a single integer)
+            std::cout << "Invalid input. Please enter a single number.\n";
+            continue;
+        }
+        
+        if (u == -1) {
+            std::cout << "Finished. Selected dataset size is "
+                      << selected_data.size() << "\n";
+            break;
+        }
+        
+        if (u >= 0 && u < static_cast<int>(data.size())) {
+            selected_data.push_back(data[u]);
+            std::cout << "Added: \"" << data[u] << "\"\n";
+        } else {
+            std::cout << "Index " << u << " is out of bounds. Dataset size is " 
+                      << data.size() << "\n";
+        }
+    }
+    
+    return selected_data;
 }
 
-}
-return selected_data;
-}
 std::tuple<sycl::device,int> Program_device_selector(){
     int n;
     std::cout<<"1-CPU, 2-GPU, 3-Hybrid ";
@@ -104,5 +135,3 @@ std::tuple<sycl::device,int> Program_device_selector(){
             return {dev,n}; 
         
     }
-
-
