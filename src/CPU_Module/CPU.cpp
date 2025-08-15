@@ -41,7 +41,7 @@ Map::Map(char* _data, std::size_t _N, int _k)
 
 void Map::operator()(sycl::nd_item<1> it) const {
     size_t gid = it.get_global_id(0);
-    if (gid > N - k) return;
+    if (gid >= (N > k ? N - k + 1 : 1)) return; // Prevent OOB
 
     bool valid = true;
     for (int i = 0; i < k; ++i) {
@@ -89,16 +89,16 @@ void Reduce::operator()(sycl::nd_item<1> it,
 
     // Per-unique counting
     if (gid > 0 && gid < N) {
-        bool same_as_prev = true;
+        bool same = true;
         for (int j = 0; j < MAXK; ++j) {
             if (mappedw[gid].word[j] != mappedw[gid - 1].word[j]) {
-                same_as_prev = false;
+                same = false;
                 break;
             }
             if (mappedw[gid].word[j] == '\0') break;
         }
 
-        if (same_as_prev) {
+        if (same) {
             // Add v to first occurrence
             sycl::atomic_ref<int,
                 sycl::memory_order::relaxed,
@@ -110,7 +110,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
     }
 
     // Block-wise reduction (optional, total sum)
-    constexpr int blocksize = 512;
+    constexpr int blocksize = 6;
     size_t lid = it.get_local_id(0);
     int v = (gid < N) ? mappedw[gid].v : 0;
     shared[lid] = v;
@@ -133,7 +133,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
 void Reduce::runkernel(int* result, sycl::queue& q) const {
     std::sort(std::execution::par, mappedw, mappedw + N, lex_compare);
 
-    size_t local_size = 4;
+    size_t local_size = 6;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
 

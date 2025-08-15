@@ -30,21 +30,16 @@ Map::Map(char* _data, std::size_t _N, int _k)
     : data(_data), N(_N), k(_k), mappedw(nullptr) {}
 
 void Map::operator()(sycl::nd_item<1> it) const  {
-    size_t gid = it.get_global_id(0);
-    if (gid > N - k) return;  
+        size_t gid = it.get_global_id(0);
+    if (gid >= (N > k ? N - k + 1 : 1)) return;  // safe mappedw indexing
 
     bool valid = true;
     for (int i = 0; i < k; ++i) {
-        if (data[gid + i] == '\0') {
-            valid = false;
-            break;
-        }
+        if (data[gid + i] == '\0') { valid = false; break; }
     }
     if (!valid) return;
 
-    for (int i = 0; i < k; ++i) {
-        mappedw[gid].word[i] = data[gid + i];
-    }
+    for (int i = 0; i < k; ++i) mappedw[gid].word[i] = data[gid + i];
     mappedw[gid].word[k] = '\0';
     mappedw[gid].v = 1;
 }
@@ -67,33 +62,30 @@ void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
     size_t gid = it.get_global_id(0);
+    size_t mapped_size = N > MAXK ? N - MAXK + 1 : 1;
+    if (gid >= mapped_size) { shared[it.get_local_id(0)] = 0; return; }
 
-    // Each thread checks if it is a duplicate of the previous
-    if (gid > 0 && gid < N) {
+    // Per-unique counting
+    if (gid > 0) {
         bool same = true;
         for (int j = 0; j < MAXK; ++j) {
-            if (mappedw[gid].word[j] != mappedw[gid - 1].word[j]) {
-                same = false;
-                break;
-            }
+            if (mappedw[gid].word[j] != mappedw[gid-1].word[j]) { same = false; break; }
             if (mappedw[gid].word[j] == '\0') break;
         }
-
         if (same) {
-            // Add v to first occurrence
             sycl::atomic_ref<int,
                 sycl::memory_order::relaxed,
                 sycl::memory_scope::device,
-                sycl::access::address_space::global_space> afr(mappedw[gid - 1].v);
+                sycl::access::address_space::global_space> afr(mappedw[gid-1].v);
             afr.fetch_add(mappedw[gid].v);
-            mappedw[gid].v = 0; // zero out duplicate
+            mappedw[gid].v = 0;
         }
     }
 
+    // Block-wise sum
     constexpr int blocksize = 512;
     size_t lid = it.get_local_id(0);
-    int v = (gid < N) ? mappedw[gid].v : 0;
-    shared[lid] = v;
+    shared[lid] = mappedw[gid].v;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
