@@ -15,7 +15,6 @@ namespace sycl = cl::sycl;
 
 namespace GPU {
 
-// ===== Mapped =====
 Mapped Mapped::operator+(const Mapped& other) const {
     Mapped m;
     for ( int i=0; i<MAXK+1 ; i++){
@@ -25,7 +24,6 @@ Mapped Mapped::operator+(const Mapped& other) const {
     return m;
 }
 
-// ===== Map =====
 Map::Map(char* _data, std::size_t _N, int _k)
     : data(_data), N(_N), k(_k), mappedw(nullptr) {}
 
@@ -54,7 +52,6 @@ void Map::runkernel(sycl::queue q) const {
     }).wait();
 }
 
-// ===== Reduce =====
 Reduce::Reduce(Mapped* _mappedw, std::size_t _N)
     : mappedw(_mappedw), N(_N) {}
 
@@ -65,7 +62,6 @@ void Reduce::operator()(sycl::nd_item<1> it,
     size_t mapped_size = N > MAXK ? N - MAXK + 1 : 1;
     if (gid >= mapped_size) { shared[it.get_local_id(0)] = 0; return; }
 
-    // Per-unique counting
     if (gid > 0) {
         bool same = true;
         for (int j = 0; j < MAXK; ++j) {
@@ -116,12 +112,12 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
         });
     }).wait();
 }
-
+//i found this somewhere
 void Reduce::radixsort(sycl::queue &q, size_t k) const {
     Mapped* pointer = mappedw;
-    size_t NN = N;
+    size_t n = N;
 
-    Mapped* tmp = sycl::malloc_shared<Mapped>(NN, q);
+    Mapped* tmp = sycl::malloc_shared<Mapped>(n, q);
     constexpr int radix = 4;
 
     for (int pos = (int)k - 1; pos >= 0; --pos) {
@@ -132,9 +128,9 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
         q.wait();
 
         q.submit([&](sycl::handler &h) {
-            h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
+            h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
-                if (i < NN) {
+                if (i < n) {
                     char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
@@ -158,9 +154,9 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
         }).wait();
 
         q.submit([&](sycl::handler &h) {
-            h.parallel_for(sycl::range<1>(NN), [=](sycl::id<1> gid) {
+            h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
-                if (i < NN) {
+                if (i < n) {
                     char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
@@ -176,7 +172,7 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
             });
         }).wait();
 
-        q.memcpy(pointer, tmp, NN * sizeof(Mapped)).wait();
+        q.memcpy(pointer, tmp, n * sizeof(Mapped)).wait();
 
         sycl::free(counts, q);
         sycl::free(prefix, q);

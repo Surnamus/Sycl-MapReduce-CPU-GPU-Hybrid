@@ -11,9 +11,9 @@
 
 namespace sycl = cl::sycl;
 constexpr int MAXK=3;
-int compute_unique_total(GPU::Mapped* mappedw, size_t mapped_size) {
+int compute_unique_total(GPU::Mapped* mappedw, size_t setsize) {
     int total = 0;
-    for (size_t i = 0; i < mapped_size; ++i) {
+    for (size_t i = 0; i < setsize; ++i) {
         total += mappedw[i].v; // only unique counts
     }
     return total;
@@ -23,8 +23,8 @@ void run() {
     f << "go\n";
     f.close();
 }
-void print_mapped_counts(GPU::Mapped* mappedw, size_t mapped_size, int k) {
-    for (size_t i = 0; i < mapped_size; ++i) {
+void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
+    for (size_t i = 0; i < setsize; ++i) {
         if (mappedw[i].v > 0 && mappedw[i].word[0] != '\0') {
             mappedw[i].word[k] = '\0'; // ensure termination
             std::cout << mappedw[i].word << " : " << mappedw[i].v << "\n";
@@ -59,7 +59,7 @@ int main() {
     auto datadev = convert(dataset_used);
     int k = MAXK; // you said k == MAXK
     size_t N = datadev.first.size();
-    size_t mapped_size = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
+    size_t setsize = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
 
     // allocate result using the default queue q (OK for all cases)
     int* result = sycl::malloc_shared<int>(1, q);
@@ -75,22 +75,22 @@ int main() {
         flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(mapped_size, alloc_q);
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
         // initialize mappedwm...
-        for (size_t i = 0; i < mapped_size; ++i) {
+        for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
         // run GPU kernels on the same queue 'q'
         run();
-        GPU::Map map_op(flat_data, N, k);
-        map_op.mappedw = mappedwm;
-        map_op.runkernel(q);
+        GPU::Map mapf(flat_data, N, k);
+        mapf.mappedw = mappedwm;
+        mapf.runkernel(q);
         q.wait();
 
-        GPU::Reduce reduce_op(mappedwm, N);
-        reduce_op.runkernel(result, q);
+        GPU::Reduce reducef(mappedwm, N);
+        reducef.runkernel(result, q);
         q.wait();
     }
     else if (std::get<1>(dev) == 2) {
@@ -99,20 +99,20 @@ int main() {
         flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(mapped_size, alloc_q);
-        for (size_t i = 0; i < mapped_size; ++i) {
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
+        for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
         run();
-        CPU::Map map_op(flat_data, N, k);
-        map_op.mappedw = reinterpret_cast<CPU::Mapped*>(mappedwm);
-        map_op.runkernel(q);
+        CPU::Map mapf(flat_data, N, k);
+        mapf.mappedw = reinterpret_cast<CPU::Mapped*>(mappedwm);
+        mapf.runkernel(q);
         q.wait();
 
-        CPU::Reduce reduce_op(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
-        reduce_op.runkernel(result, q);
+        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
+        reducef.runkernel(result, q);
         q.wait();
     }
     else {
@@ -125,29 +125,26 @@ int main() {
         flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, alloc_q);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(mapped_size, alloc_q);
-        for (size_t i = 0; i < mapped_size; ++i) {
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, alloc_q);
+        for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
         run();
-        // Map on GPU queue (writer)
-        GPU::Map map_op(flat_data, N, k);
-        map_op.mappedw = mappedwm;
-        map_op.runkernel(gpu_q);
+        GPU::Map mapf(flat_data, N, k);
+        mapf.mappedw = mappedwm;
+        mapf.runkernel(gpu_q);
         gpu_q.wait();
 
-        // Reduce on CPU using CPU queue (reader)
-        CPU::Reduce reduce_op(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
-        reduce_op.runkernel(result, cpu_q);
+        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
+        reducef.runkernel(result, cpu_q);
         cpu_q.wait();
     }
 
-    // safe printing...
-    print_mapped_counts(mappedwm, mapped_size, k);
+    print_mapped_counts(mappedwm, setsize, k);
     int total_unique = 0;
-    for (size_t i = 0; i < mapped_size; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
+    for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
 }
 
 
