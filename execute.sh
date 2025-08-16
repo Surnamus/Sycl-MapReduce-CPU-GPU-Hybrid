@@ -7,16 +7,13 @@ cd build
 rm -rf ./*
 
 cmake -DCMAKE_BUILD_TYPE=Release ..
-
 cmake --build . --parallel 4
-wait   
 cd ..
-./scripts/decompressor.sh
-wait   
-./scripts/modifier.sh
-wait   
-./scripts/truncator.sh
-wait   
-./scripts/testsuite.sh
-wait   
+
+# Redirect stdin to avoid blocking C++ input later
+./scripts/decompressor.sh < /dev/null
+./scripts/modifier.sh < /dev/null
+./scripts/truncator.sh < /dev/null
+./scripts/testsuite.sh < /dev/null
+
 python3 ./scripts/plotter.py

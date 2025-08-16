@@ -1,17 +1,43 @@
+from datetime import datetime
+import os
+import re
+import matplotlib
 import matplotlib.pyplot as plt
 import random
 
+matplotlib.use("Agg")
+
 def randcolor():
     randcmapname = random.choice(plt.colormaps())
-    cmap = plt.get_cmap(randcmapname)
-    randcmapcolor = cmap(random.random())
-    return randcmapcolor
+    return plt.get_cmap(randcmapname)(random.random())
 
-def plotter2par(measx, measy, x, y):
+def detect_device_type(cpp_path="project/src/main.cpp"):
+    if not os.path.exists(cpp_path):
+        return "CPU"
+    with open(cpp_path, "r", encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+    m = re.search(r'Program_device_selector\s*\(\s*(\d+)\s*\)', text)
+    if m:
+        return {0:"CPU",1:"GPU",2:"Hybrid"}.get(int(m.group(1)), "CPU")
+    m2 = re.search(r'std::make_tuple\s*\([^\)]*,\s*(\d+)\s*\)', text)
+    if m2:
+        return {2:"CPU",1:"GPU",3:"Hybrid"}.get(int(m2.group(1)), "CPU")
+    return "CPU"
+
+def plotter2par(measx, measy, xlabel, ylabel, savedir, prefix=None):
+    if not measx or not measy:
+        return
+    fig = plt.figure()
     plt.plot(measx, measy, color=randcolor())
-    plt.xlabel(x)
-    plt.ylabel(y)
-    plt.show()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    safepref = prefix if prefix else f"{xlabel}_vs_{ylabel}"
+    os.makedirs(savedir, exist_ok=True)
+    savepath = os.path.join(savedir, f"{safepref}_{ts}.png")
+    fig.savefig(savepath, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {savepath}")
 
 time = []
 gtemp = []
@@ -24,24 +50,18 @@ cmem = []
 file_path = 'measurements.log'
 
 try:
-    # Read entire file
     with open(file_path, 'r') as f:
         lines = f.readlines()
-
-    # Find all indexes where "Time(s)" occurs
     time_indexes = [i for i, line in enumerate(lines) if line.startswith("Time(s)")]
-
     if not time_indexes:
         raise ValueError("No 'Time(s)' found in file.")
-
-    # Take the last occurrence
     start_idx = time_indexes[-1] + 1
-
-    # Read until end or until "End time:" is found
     for line in lines[start_idx:]:
         if not line.strip() or line.startswith("End time:"):
             break
         lis = line.split()
+        if len(lis) < 7:
+            continue
         time.append(lis[0])
         ctemp.append(lis[1])
         gtemp.append(lis[2])
@@ -50,17 +70,25 @@ try:
         cutil.append(lis[5])
         cmem.append(lis[6])
 
-    # Plotting
-    plotter2par(time, ctemp, 'time', 'cpu_util')
-    plotter2par(time, gtemp, 'time', 'gpu_util')
-    plotter2par(time, ctemp, 'time', 'cpu_temp')
-    plotter2par(time, gtemp, 'time', 'gpu_temp')
-    plotter2par(gutil, gtemp, 'gpu_util', 'gpu_temp')
-    plotter2par(cutil, ctemp, 'cpu_util', 'cpu_temp')
-    plotter2par(gtemp, gmem, 'gpu_temp', 'gpu_mem')
-    plotter2par(ctemp, cmem, 'cpu_temp', 'cpu_mem')
-    plotter2par(gutil, gmem, 'gpu_util', 'gpu_mem')
-    plotter2par(cutil, cmem, 'cpu_util', 'cpu_mem')
+    project_root = "project"
+    device_folder = detect_device_type(os.path.join(project_root, "src/main.cpp"))
+    if device_folder not in ["CPU","GPU","Hybrid"]:
+        device_folder = "CPU"
+
+    for sub in ["CPU","GPU","Hybrid"]:
+        os.makedirs(os.path.join(project_root, "results", sub), exist_ok=True)
+
+    savedir = os.path.join(project_root, "results", device_folder)
+    plotter2par(time, ctemp, 'time', 'cpu_util', savedir, "time_cpu_util")
+    plotter2par(time, gtemp, 'time', 'gpu_util', savedir, "time_gpu_util")
+    plotter2par(time, ctemp, 'time', 'cpu_temp', savedir, "time_cpu_temp")
+    plotter2par(time, gtemp, 'time', 'gpu_temp', savedir, "time_gpu_temp")
+    plotter2par(gutil, gtemp, 'gpu_util', 'gpu_temp', savedir, "gpu_util_gpu_temp")
+    plotter2par(cutil, ctemp, 'cpu_util', 'cpu_temp', savedir, "cpu_util_cpu_temp")
+    plotter2par(gtemp, gmem, 'gpu_temp', 'gpu_mem', savedir, "gpu_temp_gpu_mem")
+    plotter2par(ctemp, cmem, 'cpu_temp', 'cpu_mem', savedir, "cpu_temp_cpu_mem")
+    plotter2par(gutil, gmem, 'gpu_util', 'gpu_mem', savedir, "gpu_util_gpu_mem")
+    plotter2par(cutil, cmem, 'cpu_util', 'cpu_mem', savedir, "cpu_util_cpu_mem")
 
 except FileNotFoundError:
     print(f"Error: The file '{file_path}' was not found.")

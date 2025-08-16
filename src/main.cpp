@@ -1,4 +1,5 @@
-
+//fix gpu so that it used setsize
+//fix plotter
 #include <CL/sycl.hpp>
 #include <iostream>
 #include <vector>
@@ -85,7 +86,7 @@ int main() {
         mapf.runkernel(q);
         q.wait();
 
-        GPU::Reduce reducef(mappedwm, N);
+        GPU::Reduce reducef(mappedwm, setsize);
         reducef.runkernel(result, q);
         q.wait();
     }
@@ -106,7 +107,7 @@ int main() {
         mapf.runkernel(q);
         q.wait();
 
-        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
+        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         reducef.runkernel(result, q);
         q.wait();
     }
@@ -131,6 +132,8 @@ int main() {
         gpu_q.wait();
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
+        //setsize
+        //test in helper later
         reducef.runkernel(result, cpu_q);
         cpu_q.wait();
     }
@@ -138,6 +141,9 @@ int main() {
     print_mapped_counts(mappedwm, setsize, k);
     int total_unique = 0;
     for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
+    sycl::free(flat_data, q_used);
+    sycl::free(mappedwm, q_used);
+    sycl::free(result, q_used); 
 }
 
 

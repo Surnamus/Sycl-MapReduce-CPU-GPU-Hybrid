@@ -1,3 +1,5 @@
+//fix this gpu code ,aka memory bounds and analyse why
+
 #include <filesystem>
 #include <CL/sycl.hpp>
 #include <fstream>
@@ -129,11 +131,13 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
         q.submit([&](sycl::handler &h) {
             h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
+                if (i >= n) return; 
                 if (i < n) {
                     char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
                               (c == 'G') ? 2 : 3;
+                    if (val >= radix) return;        
                     sycl::atomic_ref<int,
                         sycl::memory_order::relaxed,
                         sycl::memory_scope::device,
@@ -155,17 +159,21 @@ void Reduce::radixsort(sycl::queue &q, size_t k) const {
         q.submit([&](sycl::handler &h) {
             h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
                 size_t i = gid[0];
+                if (i >= n) return;  
                 if (i < n) {
                     char c = pointer[i].word[pos];
                     int val = (c == 'A') ? 0 :
                               (c == 'C') ? 1 :
                               (c == 'G') ? 2 : 3;
+
                     sycl::atomic_ref<int,
                         sycl::memory_order::relaxed,
                         sycl::memory_scope::device,
                         sycl::access::address_space::global_space>
                         afr(prefix[val]);
                     int idx = afr.fetch_add(1);
+                    if (idx >= n) return;  
+                    if (val >= radix) return;
                     tmp[idx] = pointer[i]; 
                 }
             });
