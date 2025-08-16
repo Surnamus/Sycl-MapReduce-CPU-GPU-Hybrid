@@ -58,7 +58,7 @@ int main() {
     sycl::queue q{std::get<0>(dev)}; 
 
     auto datadev = convert(dataset_used);
-    int k = MAXK; // you said k == MAXK
+    int k = MAXK; 
     size_t N = datadev.first.size();
     size_t setsize = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
 

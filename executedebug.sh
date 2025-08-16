@@ -30,4 +30,4 @@ wait
 wait   
 ./scripts/testsuite.sh
 wait   
-python3 ./scripts/plotter.py
+#python3 ./scripts/plotter.py
