@@ -6,7 +6,7 @@ FOLDER="$DATASET/modified"
 
 mkdir -p "$FOLDER"
 
-N=5  # number of characters to keep
+N=2000  # number of characters to keep
 
 # truncate all .txt files in modified folder recursively
 find "$FOLDER" -type f -name "*.txt" | while read -r file; do

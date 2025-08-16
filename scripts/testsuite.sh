@@ -1,7 +1,7 @@
 #!/bin/bash
 
 LOGFILE="measurements.log"
-INTERVAL=1
+INTERVAL=0.1
 
 echo "Start time: $(date)" >> "$LOGFILE"
 
@@ -30,7 +30,7 @@ echo "Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem" >> "$LOGFILE"
 while kill -0 "$PID" 2>/dev/null; do
     now=$(( $(date +%s) - start ))
 
-    cpu_temp=$(sensors | awk '/Package id 0/ {gsub("\\+|°C","",$4); print $4}')
+    cpu_temp=$(sensors | grep 'Tctl' | awk '{print $2}' | sed 's/+//' | sed 's/°C//')
     cpu_temp=${cpu_temp:-0}
 
     gpu_stats=$(nvidia-smi --query-gpu=temperature.gpu,utilization.gpu,memory.used \

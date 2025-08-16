@@ -33,6 +33,14 @@ void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
     }
 }
 
+void print_mapped_counts(CPU::Mapped* mappedw, size_t setsize, int k) {
+    for (size_t i = 0; i < setsize; ++i) {
+        if (mappedw[i].v > 0 && mappedw[i].word[0] != '\0') {
+            mappedw[i].word[k] = '\0'; // ensure termination
+            std::cout << mappedw[i].word << " : " << mappedw[i].v << "\n";
+        }
+    }
+}
 
 std::pair<std::string, std::vector<size_t>> convert(std::vector<std::string> strings) {
     std::vector<size_t> offsets;
@@ -89,6 +97,7 @@ int main() {
         GPU::Reduce reducef(mappedwm, setsize);
         reducef.runkernel(result, q);
         q.wait();
+        print_mapped_counts(mappedwm, setsize, k);
     }
     else if (std::get<1>(dev) == 2) {
         q_used = q;
@@ -110,6 +119,7 @@ int main() {
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         reducef.runkernel(result, q);
         q.wait();
+        print_mapped_counts(mappedwm, setsize, k);
     }
     else {
         sycl::queue gpu_q{sycl::gpu_selector{}};
@@ -138,7 +148,6 @@ int main() {
         cpu_q.wait();
     }
 
-    print_mapped_counts(mappedwm, setsize, k);
     int total_unique = 0;
     for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
     sycl::free(flat_data, q_used);

@@ -79,8 +79,8 @@ try:
         os.makedirs(os.path.join(project_root, "results", sub), exist_ok=True)
 
     savedir = os.path.join(project_root, "results", device_folder)
-    plotter2par(time, ctemp, 'time', 'cpu_util', savedir, "time_cpu_util")
-    plotter2par(time, gtemp, 'time', 'gpu_util', savedir, "time_gpu_util")
+    plotter2par(time, cutil, 'time', 'cpu_util', savedir, "time_cpu_util")
+    plotter2par(time, gutil, 'time', 'gpu_util', savedir, "time_gpu_util")
     plotter2par(time, ctemp, 'time', 'cpu_temp', savedir, "time_cpu_temp")
     plotter2par(time, gtemp, 'time', 'gpu_temp', savedir, "time_gpu_temp")
     plotter2par(gutil, gtemp, 'gpu_util', 'gpu_temp', savedir, "gpu_util_gpu_temp")

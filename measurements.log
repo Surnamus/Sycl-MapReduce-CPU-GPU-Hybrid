@@ -1,0 +1,209 @@
+Start time: Sat Aug 16 04:29:16 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.67 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+0 0 52 0 250 72.8 2403
+1 0 52 0 250 15.2 2416
+2 0 52 0 250 15.9 2419
+3 0 52 0 250 13.9 2419
+4 0 52 0 250 12.3 2417
+4 0 52 0 250 25.0 2419
+5 0 52 0 250 10.9 2421
+6 0 52 0 250 11.9 2419
+7 0 52 0 250 15.0 2422
+7 0 52 0 250 14.5 2422
+8 0 52 0 250 17.6 2417
+9 0 52 0 250 13.5 2419
+
+End time: Sat Aug 16 04:29:26 PM UTC 2025
+Execution time: 10 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.66 0 250
+Start time: Sat Aug 16 04:35:45 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.67 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+0 0 52 0 250 74.6 2568
+1 0 52 0 250 12.7 2570
+2 0 52 0 250 9.6 2570
+3 0 52 0 250 17.1 2575
+3 0 52 0 250 28.0 2575
+4 0 52 0 250 11.8 2572
+5 0 52 0 250 11.2 2575
+6 0 52 0 250 21.6 2578
+6 0 52 0 250 14.6 2575
+7 0 52 0 250 15.4 2581
+8 0 52 0 250 5.2 2530
+
+End time: Sat Aug 16 04:35:54 PM UTC 2025
+Execution time: 9 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.69 0 250
+Start time: Sat Aug 16 04:38:45 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.67 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+1 49.4 52 0 250 75.6 2603
+1 50.5 52 0 250 10.0 2613
+2 50.2 52 0 250 12.4 2611
+3 49.9 52 0 250 9.8 2610
+4 49.6 52 0 250 15.7 2612
+4 49.4 52 0 250 8.9 2613
+5 49.1 52 0 250 16.5 2607
+6 49.0 52 0 250 10.8 2607
+7 48.9 52 0 250 15.2 2613
+7 48.6 52 0 250 11.2 2606
+8 48.4 52 0 250 11.8 2606
+
+End time: Sat Aug 16 04:38:54 PM UTC 2025
+Execution time: 9 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.68 0 250
+Start time: Sat Aug 16 04:44:23 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.62 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+0 51.0 52 0 250 68.8 2325
+0 51.4 52 0 250 28.5 2322
+1 51.5 52 0 250 8.7 2320
+
+End time: Sat Aug 16 04:44:24 PM UTC 2025
+Execution time: 1 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.68 0 250
+Start time: Sat Aug 16 04:48:03 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.61 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+0 52.0 52 0 250 69.5 2391
+0 52.2 52 0 250 28.9 2381
+1 52.4 52 0 250 10.0 2354
+
+End time: Sat Aug 16 04:48:04 PM UTC 2025
+Execution time: 1 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.67 0 250
+Start time: Sat Aug 16 04:57:13 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.62 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+1 51.0 52 0 250 40.3 2447
+1 51.2 52 0 250 60.4 2441
+1 51.6 52 0 250 19.5 2443
+
+End time: Sat Aug 16 04:57:15 PM UTC 2025
+Execution time: 2 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.68 0 250
+Start time: Sat Aug 16 05:10:32 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.59 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+1 49.9 52 0 250 68.8 2693
+
+End time: Sat Aug 16 05:10:33 PM UTC 2025
+Execution time: 1 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.63 0 250
+Start time: Sat Aug 16 05:17:02 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+52 21.68 0 250
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+0 51.9 52 0 250 66.7 2665
+
+End time: Sat Aug 16 05:17:02 PM UTC 2025
+Execution time: 0 seconds
+
+CPU (end):
+
+GPU (end):
+52 21.75 0 250
+Start time: Sat Aug 16 05:45:09 PM UTC 2025
+
+CPU (start):
+
+GPU (start):
+53 21.80 3 0
+
+Running ./main...
+
+Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem
+2 38.6 52 3 3 44.3 2028
+2 39.5 52 3 0 0.5 1965
+
+End time: Sat Aug 16 05:45:15 PM UTC 2025
+Execution time: 4 seconds
+
+CPU (end):
+
+GPU (end):
+53 22.05 3 0
