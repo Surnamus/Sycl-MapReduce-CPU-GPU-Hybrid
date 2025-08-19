@@ -61,52 +61,52 @@ void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
     size_t gid = it.get_global_id(0);
-    //size_t mapped_size = N > MAXK ? N - MAXK + 1 : 1;
-        size_t mapped_size = rN;
-   // if (gid >= mapped_size) { shared[it.get_local_id(0)] = 0; return; }
-       if (gid > 0) {
-    // Only merge if this is the **last element of the run**
-    bool is_last = (gid == rN-1);
-    for (int j = 0; j < MAXK && !is_last; ++j)
-        if (mappedw[gid].word[j] != mappedw[gid+1].word[j] && mappedw[gid+1].word[j] != '\0') {
-            is_last = true;
-            break;
-        }
+    size_t mapped_size = rN;
 
-    if (is_last) {
-        int head = gid;
-        while (head > 0) {
-            bool same = true;
+    if (gid > 0) {
+        bool is_last = (gid == rN - 1);
+        if (!is_last) {
             for (int j = 0; j < MAXK; ++j) {
-                char a = mappedw[head].word[j];
-                char b = mappedw[head-1].word[j];
-                if (a != b) { same = false; break; }
-                if (a == '\0') break;
+                char a = mappedw[gid].word[j];
+                char b = mappedw[gid+1].word[j];
+                if (a != b) { is_last = true; break; }
+                if (a == '\0' || b == '\0') break;
             }
-            if (!same) break;
-            head--;
         }
 
-        int sum = 0;
-        for (int i = head; i <= gid; i++) {
-            sum += mappedw[i].v;
-            if (i != head) mappedw[i].v = 0;
-        }
+        if (is_last) {
+            int head = gid;
+            while (head > 0) {
+                bool same = true;
+                for (int j = 0; j < MAXK; ++j) {
+                    char a = mappedw[head].word[j];
+                    char b = mappedw[head-1].word[j];
+                    if (a != b) { same = false; break; }
+                    if (a == '\0') break;
+                }
+                if (!same) break;
+                head--;
+            }
 
-        sycl::atomic_ref<int,
-            sycl::memory_order::relaxed,
-            sycl::memory_scope::device,
-            sycl::access::address_space::global_space> afr(mappedw[head].v);
-        afr.fetch_add(sum - mappedw[head].v);
-    } else {
-        mappedw[gid].v = 0; // prevent duplicate counting
+            int sum = 0;
+            for (int i = head; i <= gid; i++) {
+                sum += mappedw[i].v;
+                if (i != head) mappedw[i].v = 0;
+            }
+
+            sycl::atomic_ref<int,
+                sycl::memory_order::relaxed,
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> afr(mappedw[head].v);
+            afr.fetch_add(sum - mappedw[head].v);
+        } else {
+            mappedw[gid].v = 0;
+        }
     }
-}
 
-   
     constexpr int blocksize = 512;
     size_t lid = it.get_local_id(0);
-    shared[lid] = (gid < rN) ? mappedw[gid].v : 0;
+    shared[lid] = (gid < rN && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
@@ -122,6 +122,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
         afr.fetch_add(shared[0]);
     }
 }
+
 //here
 
 void Reduce::runkernel(int* result, sycl::queue q) const {
@@ -131,6 +132,7 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
     
     //radixsort(q,MAXK);
+    //better cpu sorting for now
     std::stable_sort(mappedw, mappedw + rN, [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
     auto self = *this; 
