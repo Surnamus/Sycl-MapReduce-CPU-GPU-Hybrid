@@ -2,7 +2,7 @@
 # --- CONFIGURATION ---
 BUILD_DIR=debug
 TARGET=project          # name of executable
-USE_GPU=1            # 1=GPU (CUDA backend), 0=CPU-only
+USE_GPU=1           # 1=GPU (CUDA backend), 0=CPU-only
 set -e 
 # --- CREATE BUILD DIRECTORY ---
 mkdir -p $BUILD_DIR
@@ -22,11 +22,14 @@ else
     gdb ./$TARGET
 fi
 cd ..
+
 ./scripts/decompressor.sh
 wait   
 ./scripts/modifier.sh
 wait   
 ./scripts/truncator.sh
+wait
+python3 ./scripts/verifier.py
 wait   
 ./scripts/testsuite.sh
 wait   

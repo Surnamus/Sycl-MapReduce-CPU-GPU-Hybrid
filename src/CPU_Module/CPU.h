@@ -44,6 +44,7 @@ namespace CPU {
                         sycl::local_accessor<int, 1> shared,
                         int* result) const;
         void runkernel(int* result, sycl::queue& _q) const;
+        void seqRed(Mapped* mappedw,size_t* newsize,size_t s);
     };
 }
 #endif

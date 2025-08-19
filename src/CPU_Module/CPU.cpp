@@ -10,6 +10,9 @@
 #include <cstdlib> 
 #include <algorithm>
 #include <ctime>
+#include <cstring>
+#include <map>
+
 #include "CPU.h"
 
 namespace sycl = cl::sycl;
@@ -131,4 +134,29 @@ void Reduce::runkernel(int* result, sycl::queue& q) const {
     }).wait();
 }
 
-} // namespace CPU
+
+void Reduce::seqRed(Mapped* mappedw, size_t* newsize, size_t s) {
+    if (N == 0) {
+        *newsize = 0;
+        return;
+    }
+
+    std::stable_sort(mappedw, mappedw + N,
+        [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
+
+    int t = 0;  
+
+    for (int i = 1; i < N; ++i) {
+        if (std::strcmp(mappedw[i].word, mappedw[t].word) == 0) {
+            mappedw[t].v += mappedw[i].v; 
+        } else {
+            t++;
+            mappedw[t] = mappedw[i]; 
+        }
+    }
+
+    *newsize = t + 1; 
+}
+
+ // namespace CPU
+}

@@ -9,13 +9,15 @@
 #include "helper.h"
 #include "GPU.h"
 #include "CPU.h"
+#include <unordered_set>
+#include <string>
 
 namespace sycl = cl::sycl;
 constexpr int MAXK=3;
 int compute_unique_total(GPU::Mapped* mappedw, size_t setsize) {
     int total = 0;
     for (size_t i = 0; i < setsize; ++i) {
-        total += mappedw[i].v; // only unique counts
+        total += mappedw[i].v; 
     }
     return total;
 }
@@ -25,18 +27,28 @@ void run() {
     f.close();
 }
 void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
+    std::ofstream out("/home/user/project/output.txt"); // hardcoded output file
+    if (!out) {
+        std::cerr << "Failed to open output file\n";
+        return;
+    }
+
+    std::unordered_set<std::string> printed;
+
     for (size_t i = 0; i < setsize; ++i) {
-        if (mappedw[i].v > 0 && mappedw[i].word[0] != '\0') {
-            mappedw[i].word[k] = '\0'; // ensure termination
-            std::cout << mappedw[i].word << " : " << mappedw[i].v << "\n";
+        if (mappedw[i].v > 1 && mappedw[i].word[0] != '\0') {
+            std::string w(mappedw[i].word, k); // assuming word length k
+            if (printed.find(w) == printed.end()) { // not printed yet
+                out << w << " : " << mappedw[i].v << "\n";
+                printed.insert(w);
+            }
         }
     }
 }
-
-void print_mapped_counts(CPU::Mapped* mappedw, size_t setsize, int k) {
-    for (size_t i = 0; i < setsize; ++i) {
-        if (mappedw[i].v > 0 && mappedw[i].word[0] != '\0') {
-            mappedw[i].word[k] = '\0'; // ensure termination
+void print_mapped_counts(CPU::Mapped* mappedw, size_t u, int k) {
+    for (size_t i = 0; i < u; ++i) {
+        if (mappedw[i].v != -1 && mappedw[i].word[0] != '\0') { // 
+          //  mappedw[i].word[k] = '\0'; // ensure termination
             std::cout << mappedw[i].word << " : " << mappedw[i].v << "\n";
         }
     }
@@ -98,6 +110,7 @@ int main() {
         reducef.runkernel(result, q);
         q.wait();
         print_mapped_counts(mappedwm, setsize, k);
+        
     }
     else if (std::get<1>(dev) == 2) {
         q_used = q;
@@ -117,9 +130,14 @@ int main() {
         q.wait();
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
-        reducef.runkernel(result, q);
-        q.wait();
-        print_mapped_counts(mappedwm, setsize, k);
+        //reducef.runkernel(result, q);
+       // q.wait();
+       // CPU::Reduce redf(reinterpret_cast<CPU::Mapped*>(mappedwm),setsize);
+           size_t* result1 = sycl::malloc_shared<size_t>(1, q);
+    *result = 0;
+
+        reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
+        print_mapped_counts(mappedwm,(size_t)*result1, k);
     }
     else {
         sycl::queue gpu_q{sycl::gpu_selector{}};
@@ -142,14 +160,14 @@ int main() {
         gpu_q.wait();
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
-        //setsize
-        //test in helper later
+        
         reducef.runkernel(result, cpu_q);
         cpu_q.wait();
     }
 
     int total_unique = 0;
     for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
+    std::cout<<"check output.txt in /home/user/project/output.txt"<<std::endl;
     sycl::free(flat_data, q_used);
     sycl::free(mappedwm, q_used);
     sycl::free(result, q_used); 

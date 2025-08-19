@@ -33,9 +33,9 @@ namespace GPU{
 
   struct Reduce{
       Mapped* mappedw;
-      std::size_t N;
+      std::size_t rN;
 
-      Reduce(Mapped* _mappedw, std::size_t _N);
+      Reduce(Mapped* _mappedw, std::size_t _rN);
 
       void operator()(sycl::nd_item<1> it,
                       sycl::local_accessor<int, 1> shared,

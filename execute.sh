@@ -9,11 +9,10 @@ rm -rf ./*
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --parallel 4
 cd ..
-
-# Redirect stdin to avoid blocking C++ input later
 ./scripts/decompressor.sh < /dev/null
 ./scripts/modifier.sh < /dev/null
 ./scripts/truncator.sh < /dev/null
+python3 ./scripts/verifier.py
 ./scripts/testsuite.sh < /dev/null
 
-python3 ./scripts/plotter.py
+#python3 ./scripts/plotter.py
