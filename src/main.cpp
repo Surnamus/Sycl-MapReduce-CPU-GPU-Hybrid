@@ -119,7 +119,7 @@ int main() {
         GPU::Reduce reducef(mappedwm, setsize);
         reducef.runkernel(result, q);
         q.wait();
-        print_mapped_countst(mappedwm, setsize, k);
+        print_mapped_counts(mappedwm, setsize, k);
         
     }
     else if (std::get<1>(dev) == 2) {
@@ -140,14 +140,10 @@ int main() {
         q.wait();
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
-        //reducef.runkernel(result, q);
-       // q.wait();
-       // CPU::Reduce redf(reinterpret_cast<CPU::Mapped*>(mappedwm),setsize);
-           size_t* result1 = sycl::malloc_shared<size_t>(1, q);
-    *result = 0;
-
-        reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
-        print_mapped_counts(mappedwm,(size_t)*result1, k);
+           reducef.runkernel(result,q);
+            q.wait();
+        //reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
+        print_mapped_counts(mappedwm,setsize, k);
     }
     else {
         sycl::queue gpu_q{sycl::gpu_selector{}};
@@ -173,6 +169,7 @@ int main() {
         
         reducef.runkernel(result, cpu_q);
         cpu_q.wait();
+        print_mapped_counts(mappedwm,setsize, k);
     }
 
     int total_unique = 0;
