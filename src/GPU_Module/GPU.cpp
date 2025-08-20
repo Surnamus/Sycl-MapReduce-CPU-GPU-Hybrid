@@ -1,5 +1,5 @@
 //fix this gpu code ,aka memory bounds and analyse why
-
+#include <utility> 
 #include <filesystem>
 #include <CL/sycl.hpp>
 #include <fstream>
@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <ctime>
 #include "GPU.h"
-
+#include <AdaptiveCpp/algorithms/algorithm.hpp>
 namespace sycl = cl::sycl;
 
 namespace GPU {
@@ -91,16 +91,21 @@ void Reduce::operator()(sycl::nd_item<1> it,
             int sum = 0;
             for (int i = head; i <= gid; i++) {
                 sum += mappedw[i].v;
-                if (i != head) mappedw[i].v = 0;
+             //   if (i != head) mappedw[i].v = 0;
+             //here
             }
+            //here
+               
 
             sycl::atomic_ref<int,
                 sycl::memory_order::relaxed,
                 sycl::memory_scope::device,
                 sycl::access::address_space::global_space> afr(mappedw[head].v);
-            afr.fetch_add(sum - mappedw[head].v);
-        } else {
-            mappedw[gid].v = 0;
+            afr.fetch_add(sum- mappedw[head].v); //- mappedw[head].v
+            //here
+             for (int i = head + 1; i <= gid; i++) {
+                     mappedw[i].v = 0;
+                    }
         }
     }
 
@@ -131,10 +136,18 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
     size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
     
-    //radixsort(q,MAXK);
     //better cpu sorting for now
-    std::stable_sort(mappedw, mappedw + rN, [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
-
+    //std::stable_sort(mappedw, mappedw + rN, [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
+    auto cmp = [](const Mapped &a, const Mapped &b) {
+    for (int i = 0; i < MAXK; ++i) {
+        char ca = a.word[i];
+        char cb = b.word[i];
+        if (ca != cb) return ca < cb;  
+        if (ca == '\0') break;        // both strings ended
+    }
+    return false;  // equal strings
+};
+acpp::algorithms::sort(q,mappedw,mappedw+rN,cmp);
     auto self = *this; 
     q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
@@ -144,80 +157,6 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
     }).wait();
     //HERE
 
-}
-//i found this somewhere
-void Reduce::radixsort(sycl::queue &q, size_t k) const {
-    Mapped* pointer = mappedw;
-    size_t n = rN;
-
-    Mapped* tmp = sycl::malloc_shared<Mapped>(n, q);
-    constexpr int radix = 4;
-
-    for (int pos = (int)k - 1; pos >= 0; --pos) {
-        int* counts = sycl::malloc_shared<int>(radix, q);
-        int* prefix = sycl::malloc_shared<int>(radix, q);
-
-        for (int i = 0; i < radix; ++i) counts[i] = 0;
-        q.wait();
-
-        q.submit([&](sycl::handler &h) {
-            h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
-                size_t i = gid[0];
-                if (i >= n) return; 
-                if (i < n) {
-                    char c = pointer[i].word[pos];
-                    int val = (c == 'A') ? 0 :
-                              (c == 'C') ? 1 :
-                              (c == 'G') ? 2 : 3;
-                    if (val >= radix) return;        
-                    sycl::atomic_ref<int,
-                        sycl::memory_order::relaxed,
-                        sycl::memory_scope::device,
-                        sycl::access::address_space::global_space>
-                        afr(counts[val]);
-                    afr.fetch_add(1);
-                }
-            });
-        }).wait();
-
-        q.submit([&](sycl::handler &h) {
-            h.single_task([=]() {
-                prefix[0] = 0;
-                for (int r = 1; r < radix; ++r)
-                    prefix[r] = prefix[r - 1] + counts[r - 1];
-            });
-        }).wait();
-
-        q.submit([&](sycl::handler &h) {
-            h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> gid) {
-                size_t i = gid[0];
-                if (i >= n) return;  
-                if (i < n) {
-                    char c = pointer[i].word[pos];
-                    int val = (c == 'A') ? 0 :
-                              (c == 'C') ? 1 :
-                              (c == 'G') ? 2 : 3;
-
-                    sycl::atomic_ref<int,
-                        sycl::memory_order::relaxed,
-                        sycl::memory_scope::device,
-                        sycl::access::address_space::global_space>
-                        afr(prefix[val]);
-                    int idx = afr.fetch_add(1);
-                    if (idx >= n) return;  
-                    if (val >= radix) return;
-                    tmp[idx] = pointer[i]; 
-                }
-            });
-        }).wait();
-
-        q.memcpy(pointer, tmp, n * sizeof(Mapped)).wait();
-
-        sycl::free(counts, q);
-        sycl::free(prefix, q);
-    }
-
-    sycl::free(tmp, q);
 }
 
 } // namespace GPU

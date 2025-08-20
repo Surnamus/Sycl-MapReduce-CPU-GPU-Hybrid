@@ -41,7 +41,7 @@ namespace GPU{
                       sycl::local_accessor<int, 1> shared,
                       int* result) const;
       void runkernel(int* result, sycl::queue q) const;
-      void radixsort(sycl::queue &q, size_t k) const;
+     // void radixsort(sycl::queue &q, size_t k) const;
   };
 }
 #endif
