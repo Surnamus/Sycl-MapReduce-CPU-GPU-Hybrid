@@ -76,33 +76,53 @@ void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
     size_t gid = it.get_global_id(0);
+    size_t mapped_size = N;
 
-    // Per-unique counting
-    if (gid > 0 && gid < N) {
-        bool same = true;
-        for (int j = 0; j < MAXK; ++j) {
-            if (mappedw[gid].word[j] != mappedw[gid - 1].word[j]) {
-                same = false;
-                break;
+    if (gid > 0) {
+        bool is_last = (gid == N - 1);
+        if (!is_last) {
+            for (int j = 0; j < MAXK; ++j) {
+                char a = mappedw[gid].word[j];
+                char b = mappedw[gid+1].word[j];
+                if (a != b) { is_last = true; break; }
+                if (a == '\0' || b == '\0') break;
             }
-            if (mappedw[gid].word[j] == '\0') break;
         }
 
-        if (same) {
-            // Add v to first occurrence
+        if (is_last) {
+            int head = gid;
+            while (head > 0) {
+                bool same = true;
+                for (int j = 0; j < MAXK; ++j) {
+                    char a = mappedw[head].word[j];
+                    char b = mappedw[head-1].word[j];
+                    if (a != b) { same = false; break; }
+                    if (a == '\0') break;
+                }
+                if (!same) break;
+                head--;
+            }
+
+            int sum = 0;
+            for (int i = head; i <= gid; i++) {
+                sum += mappedw[i].v;
+               // if (i != head) mappedw[i].v = 0;
+            }
+
             sycl::atomic_ref<int,
                 sycl::memory_order::relaxed,
-                sycl::memory_scope::device, // on CPU this is host memory
-                sycl::access::address_space::global_space> afr(mappedw[gid - 1].v);
-            afr.fetch_add(mappedw[gid].v);
-            mappedw[gid].v = 0; // zero out duplicate
-        }
+                sycl::memory_scope::device,
+                sycl::access::address_space::global_space> afr(mappedw[head].v);
+            afr.fetch_add(sum - mappedw[head].v);
+            for (int i = head + 1; i <= gid; i++) {
+                     mappedw[i].v = 0;
+                    }
+        } 
     }
 
-    constexpr int blocksize = 6;
+    constexpr int blocksize = 64;
     size_t lid = it.get_local_id(0);
-    int v = (gid < N) ? mappedw[gid].v : 0;
-    shared[lid] = v;
+    shared[lid] = (gid < N && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
@@ -120,16 +140,17 @@ void Reduce::operator()(sycl::nd_item<1> it,
 }
 
 void Reduce::runkernel(int* result, sycl::queue& q) const {
-    std::sort(std::execution::par, mappedw, mappedw + N, lex_compare);
+        std::stable_sort(mappedw, mappedw + N,
+        [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
-    size_t local_size = 6;
+    size_t local_size = 64;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
-
+            auto self =(*this);
     q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
         h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
-            (*this)(it, shared, result);
+            self(it, shared, result);
         });
     }).wait();
 }
