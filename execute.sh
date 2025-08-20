@@ -12,7 +12,9 @@ cd ..
 ./scripts/decompressor.sh < /dev/null
 ./scripts/modifier.sh < /dev/null
 ./scripts/truncator.sh < /dev/null
-python3 ./scripts/verifier.py
+./scripts/outcleaner.sh < /dev/null
+python3 ./scripts/solutiongenerator.py
 ./scripts/testsuite.sh < /dev/null
+python3 ./scripts/verifier.py
 
 #python3 ./scripts/plotter.py

@@ -1,4 +1,0 @@
- acpp main.cpp helper.cpp -o main
- //dodace se jos fajlova u zavisi sta se kompajlira
- //cmake ce tek biti napravljen
-  ./main

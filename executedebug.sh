@@ -28,9 +28,12 @@ wait
 ./scripts/modifier.sh
 wait   
 ./scripts/truncator.sh
+./scripts/outcleaner.sh
 wait
-python3 ./scripts/verifier.py
+python3 ./scripts/solutiongenerator.py
 wait   
 ./scripts/testsuite.sh
 wait   
+python3 ./scripts/verifier.py
+
 #python3 ./scripts/plotter.py
