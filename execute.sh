@@ -17,4 +17,4 @@ python3 ./scripts/solutiongenerator.py "$N" "$K"
 ./scripts/testsuite.sh "$N" "$K" "$LS" "$BS" "$dev"
 python3 ./scripts/verifier.py
 
-#python3 ./scripts/plotter.py "$dev"
+python3 ./scripts/plotter.py "$N" "$K" "$LS" "$BS" "$dev"
