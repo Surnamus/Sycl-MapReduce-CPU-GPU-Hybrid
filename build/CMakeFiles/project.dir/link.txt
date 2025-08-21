@@ -1,1 +1,0 @@
-acpp -O3 -DNDEBUG CMakeFiles/project.dir/src/CPU_Module/CPU.cpp.o CMakeFiles/project.dir/src/GPU_Module/GPU.cpp.o CMakeFiles/project.dir/src/Hybrid_CPU_GPU/Hybrid.cpp.o CMakeFiles/project.dir/src/helper.cpp.o CMakeFiles/project.dir/src/main.cpp.o -o project 

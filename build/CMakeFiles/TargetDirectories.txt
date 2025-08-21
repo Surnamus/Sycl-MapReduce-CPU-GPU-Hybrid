@@ -1,3 +1,0 @@
-/home/user/project/build/CMakeFiles/project.dir
-/home/user/project/build/CMakeFiles/edit_cache.dir
-/home/user/project/build/CMakeFiles/rebuild_cache.dir
