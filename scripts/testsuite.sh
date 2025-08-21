@@ -3,7 +3,9 @@ N=$1
 K=$2
 LS=$3
 BS=$4
-LOGFILE="measurements.log"
+LOGDIR="$HOME/project/logs"
+mkdir -p "$LOGDIR"
+LOGFILE="$LOGDIR/measurements.log"
 INTERVAL=1
 
 echo "Start time: $(date)" >> "$LOGFILE"
