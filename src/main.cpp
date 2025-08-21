@@ -75,7 +75,11 @@ std::pair<std::string, std::vector<size_t>> convert(std::vector<std::string> str
 }
 
 
-int main() {
+int main(int argc, char* argv[]) {
+       if (argc < 6) {
+        std::cerr << "Usage: " << argv[0] << " N K LS BS\n";
+        return 1;
+    }
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
     std::vector<std::string> dataset_used = dataset_selector(datav);
@@ -87,8 +91,14 @@ int main() {
     sycl::queue q{std::get<0>(dev)}; 
 
     auto datadev = convert(dataset_used);
-    int k = MAXK; 
-    size_t N = datadev.first.size();
+    //int k = MAXK;
+     
+
+    size_t N = std::atoi(argv[1]);
+    size_t k = std::atoi(argv[2]);
+    size_t localsize = std::atoi(argv[3]);
+
+     N = datadev.first.size(); //avoid redefintion error
     size_t setsize = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
 
     int* result = sycl::malloc_shared<int>(1, q);
@@ -113,11 +123,11 @@ int main() {
         run();
         GPU::Map mapf(flat_data, N, k);
         mapf.mappedw = mappedwm;
-        mapf.runkernel(q);
+        mapf.runkernel(q,localsize);
         q.wait();
 
         GPU::Reduce reducef(mappedwm, setsize);
-        reducef.runkernel(result, q);
+        reducef.runkernel(result, q,localsize);
         q.wait();
         print_mapped_counts(mappedwm, setsize, k);
         
@@ -136,11 +146,11 @@ int main() {
         run();
         CPU::Map mapf(flat_data, N, k);
         mapf.mappedw = reinterpret_cast<CPU::Mapped*>(mappedwm);
-        mapf.runkernel(q);
+        mapf.runkernel(q,localsize);
         q.wait();
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
-           reducef.runkernel(result,q);
+           reducef.runkernel(result,q,localsize);
             q.wait();
         //reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
         print_mapped_counts(mappedwm,setsize, k);
@@ -162,18 +172,19 @@ int main() {
         run();
         GPU::Map mapf(flat_data, N, k);
         mapf.mappedw = mappedwm;
-        mapf.runkernel(gpu_q);
+        mapf.runkernel(gpu_q,localsize);
         gpu_q.wait();
-
+        size_t lssc = std::atoi(argv[4]);
+        localsize=lssc;
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
         
-        reducef.runkernel(result, cpu_q);
+        reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
         print_mapped_counts(mappedwm,setsize, k);
     }
 
-    int total_unique = 0;
-    for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
+   // int total_unique = 0;
+   // for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
     std::cout<<"check output.txt in /home/user/project/output.txt"<<std::endl;
     sycl::free(flat_data, q_used);
     sycl::free(mappedwm, q_used);

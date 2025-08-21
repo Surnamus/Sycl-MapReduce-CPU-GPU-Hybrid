@@ -12,7 +12,7 @@
 namespace sycl = cl::sycl;
 
 namespace GPU{
-  inline constexpr int MAXK=4; //
+  inline constexpr int MAXK=64; //it is what is
   struct Mapped{
     char word[MAXK+1];
     int v;
@@ -28,7 +28,7 @@ namespace GPU{
       Map(char* _data, std::size_t _N, int _k);
 
       void operator()(sycl::nd_item<1> it) const;
-      void runkernel(sycl::queue q) const;
+      void runkernel(sycl::queue q, size_t lsize) const;
   };
 
   struct Reduce{
@@ -40,7 +40,7 @@ namespace GPU{
       void operator()(sycl::nd_item<1> it,
                       sycl::local_accessor<int, 1> shared,
                       int* result) const;
-      void runkernel(int* result, sycl::queue q) const;
+      void runkernel(int* result, sycl::queue q,size_t lsize) const;
      // void radixsort(sycl::queue &q, size_t k) const;
   };
 }

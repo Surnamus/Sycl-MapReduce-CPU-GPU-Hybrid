@@ -17,7 +17,6 @@
 
 namespace sycl = cl::sycl;
 namespace CPU {
-
 Mapped Mapped::operator+(const Mapped& other) const {
     Mapped m;
     for (int i = 0; i < MAXK + 1; i++) {
@@ -50,8 +49,8 @@ void Map::operator()(sycl::nd_item<1> it) const {
     mappedw[gid].v = 1;
 }
 
-void Map::runkernel(sycl::queue& q) const {
-    size_t local_size = 4;
+void Map::runkernel(sycl::queue& q,size_t lsize) const {
+    size_t local_size = lsize;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
 
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -139,11 +138,11 @@ void Reduce::operator()(sycl::nd_item<1> it,
     }
 }
 
-void Reduce::runkernel(int* result, sycl::queue& q) const {
+void Reduce::runkernel(int* result, sycl::queue& q,size_t lsize) const {
         std::stable_sort(mappedw, mappedw + N,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
-    size_t local_size = 64;
+    size_t local_size = lsize;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
             auto self =(*this);

@@ -44,8 +44,8 @@ void Map::operator()(sycl::nd_item<1> it) const  {
     mappedw[gid].v = 1;
 }
 
-void Map::runkernel(sycl::queue q) const {
-    size_t local_size = 256;
+void Map::runkernel(sycl::queue q,size_t lsize) const {
+    size_t local_size = lsize;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
@@ -130,9 +130,8 @@ void Reduce::operator()(sycl::nd_item<1> it,
 
 //here
 
-void Reduce::runkernel(int* result, sycl::queue q) const {
+void Reduce::runkernel(int* result, sycl::queue q,size_t lsize) const {
     size_t local_size = 512;
-    bool last_group_full = (rN % local_size == 0);
     size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
     
@@ -147,6 +146,10 @@ void Reduce::runkernel(int* result, sycl::queue q) const {
     }
     return false;  // equal strings
 };
+//i wasted 3 days finding this because of their retarded aah documetation 
+//if anyone is interested look into their github page and go to docs
+//they dont have a site like normal devs do
+//0/10
 acpp::algorithms::sort(q,mappedw,mappedw+rN,cmp);
     auto self = *this; 
     q.submit([&](sycl::handler& h) {

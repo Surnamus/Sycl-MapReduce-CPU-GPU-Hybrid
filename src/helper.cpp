@@ -8,6 +8,7 @@
 #include <tuple>
 #include <cstdlib>
 #include <limits>
+#include <unistd.h> // for isatty, fileno (POSIX)
 #include "helper.h"
 
 namespace fs = std::filesystem;
@@ -43,21 +44,31 @@ std::vector<std::string> prepare() {
     return file_contents;
 }
 
-// Select datasets with robust input
+
+
 std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
     std::vector<std::string> selected_data;
     std::string line;
 
     std::cout << "Dataset size is " << data.size()
-              << ". Enter indices one per line (0 to " << data.size()-1
+              << ". Enter indices one per line (0 to " 
+              << (data.size() ? data.size()-1 : 0)
               << "), type -1 to finish. Press Enter to skip and use full dataset.\n";
 
-    // flush any leftover input
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    // Only skip if stdin is non-interactive
+    if (!isatty(fileno(stdin))) {
+        std::cout << "Non-interactive stdin detected. Using full dataset.\n";
+        return data;
+    }
 
     while (true) {
         std::cout << "Enter index: " << std::flush;
-        if (!std::getline(std::cin, line) || line.empty()) {
+        if (!std::getline(std::cin, line)) { // EOF or error
+            std::cout << "\nNo input provided (EOF). Using full dataset.\n";
+            return data;
+        }
+
+        if (line.empty()) {
             std::cout << "No input provided. Using full dataset.\n";
             return data; // fallback to full dataset
         }
@@ -71,7 +82,7 @@ std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
             } else {
                 std::cout << "Index out of bounds, ignoring.\n";
             }
-        } catch (...) {
+        } catch (const std::exception& e) {
             std::cout << "Invalid input, ignoring.\n";
         }
     }
@@ -84,37 +95,30 @@ std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
     return selected_data;
 }
 
-// -----------------------------
-// Program device selector
-// -----------------------------
 std::tuple<sycl::device, int> Program_device_selector() {
-    std::string line;
+    int default_val = 2;  // CPU
+    ///gdb here
+    const char* val = std::getenv("device");
 
-    std::cout << "\nSelect device:\n"
-              << "1 - GPU\n2 - CPU\n3 - Hybrid (GPU map + CPU reduce)\n"
-              << "Press Enter to use default (CPU).\n";
-
-    // flush leftover input
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-    std::cout << "Enter choice: " << std::flush;
-    if (!std::getline(std::cin, line) || line.empty()) {
-        std::cout << "No input provided. Using CPU by default.\n";
-        return {sycl::device(sycl::cpu_selector_v), 2};
+    if (!val) {
+        return {sycl::device(sycl::cpu_selector_v), default_val};
     }
 
     try {
-        int choice = std::stoi(line);
+        int choice = std::stoi(val);
         switch (choice) {
-            case 1: return {sycl::device(sycl::gpu_selector_v), 1};
-            case 2: return {sycl::device(sycl::cpu_selector_v), 2};
-            case 3: return {sycl::device(sycl::gpu_selector_v), 3};
-            default:
-                std::cout << "Invalid choice. Using CPU by default.\n";
+            case 1: // GPU
+                return {sycl::device(sycl::gpu_selector_v), 1};
+            case 2: // CPU
                 return {sycl::device(sycl::cpu_selector_v), 2};
+            case 3: // Hybrid (GPU map + CPU reduce)
+                return {sycl::device(sycl::gpu_selector_v), 3};  // or GPU as main device
+            default:
+                std::cerr << "Invalid 'dev' value (" << choice << "). Using CPU.\n";
+                return {sycl::device(sycl::cpu_selector_v), default_val};
         }
     } catch (...) {
-        std::cout << "Invalid input. Using CPU by default.\n";
-        return {sycl::device(sycl::cpu_selector_v), 2};
+        std::cerr << "Failed to parse 'dev'. Using CPU.\n";
+        return {sycl::device(sycl::cpu_selector_v), default_val};
     }
 }
