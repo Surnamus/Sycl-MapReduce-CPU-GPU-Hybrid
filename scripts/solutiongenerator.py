@@ -1,10 +1,12 @@
 from datetime import datetime
 import os
+import sys
 
 datasetpath = '/home/user/project/dataset/modified/'  # folder
 savefile = '/home/user/project/verifyme.txt'
 kmers = {}
-k = 3  # change k as needed
+n = int(sys.argv[1])
+k = int(sys.argv[2])
 
 def processdata(filepath):
     try:

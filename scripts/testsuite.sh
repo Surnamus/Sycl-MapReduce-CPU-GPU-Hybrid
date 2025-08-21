@@ -1,7 +1,10 @@
 #!/bin/bash
-
+N=$1
+K=$2
+LS=$3
+BS=$4
 LOGFILE="measurements.log"
-INTERVAL=0.1
+INTERVAL=1
 
 echo "Start time: $(date)" >> "$LOGFILE"
 
@@ -18,7 +21,7 @@ echo >> "$LOGFILE"
 echo "Running ./main..." >> "$LOGFILE"
 start=$(date +%s)
 
-/home/user/project/build/project & PID=$!
+/home/user/project/build/project "$N" "$K" "$LS" "$BS" "$dev" & PID=$!
 
 while [ ! -f start_measure ]; do
     sleep 0.05

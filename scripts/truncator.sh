@@ -6,8 +6,10 @@ FOLDER="$DATASET/modified"
 
 mkdir -p "$FOLDER"
 
-N=50  # number of characters to keep
+#N=50  # number of characters to keep
+N=$1  # first argument passed from execute.sh
 
+echo "Truncating files to $N characters..."
 # truncate all .txt files in modified folder recursively
 find "$FOLDER" -type f -name "*.txt" | while read -r file; do
     echo "Truncating '$file' to $N characters..."

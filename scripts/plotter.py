@@ -1,6 +1,6 @@
 from datetime import datetime
 import os
-import re
+import sys
 import matplotlib
 import matplotlib.pyplot as plt
 import random
@@ -11,19 +11,10 @@ def randcolor():
     randcmapname = random.choice(plt.colormaps())
     return plt.get_cmap(randcmapname)(random.random())
 
-def detect_device_type(cpp_path="project/src/main.cpp"):
-    if not os.path.exists(cpp_path):
-        return "CPU"
-    with open(cpp_path, "r", encoding="utf-8", errors="ignore") as f:
-        text = f.read()
-    m = re.search(r'Program_device_selector\s*\(\s*(\d+)\s*\)', text)
-    if m:
-        return {0:"CPU",1:"GPU",2:"Hybrid"}.get(int(m.group(1)), "CPU")
-    m2 = re.search(r'std::make_tuple\s*\([^\)]*,\s*(\d+)\s*\)', text)
-    if m2:
-        return {2:"CPU",1:"GPU",3:"Hybrid"}.get(int(m2.group(1)), "CPU")
-    return "CPU"
 
+def detect_device_type():
+    return int(sys.argv[5])
+    
 def plotter2par(measx, measy, xlabel, ylabel, savedir, prefix=None):
     if not measx or not measy:
         return
@@ -71,7 +62,7 @@ try:
         cmem.append(lis[6])
 
     project_root = "project"
-    device_folder = detect_device_type(os.path.join(project_root, "src/main.cpp"))
+    device_folder = detect_device_type()
     if device_folder not in ["CPU","GPU","Hybrid"]:
         device_folder = "CPU"
 
