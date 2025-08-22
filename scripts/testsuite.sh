@@ -6,21 +6,12 @@ BS=$4
 LOGDIR="$HOME/project/logs"
 mkdir -p "$LOGDIR"
 LOGFILE="$LOGDIR/measurements.log"
-INTERVAL=1
+INTERVAL=0.1
 
 echo "Start time: $(date)" >> "$LOGFILE"
 
-echo >> "$LOGFILE"
-echo "CPU (start):" >> "$LOGFILE"
-sensors | grep -E 'Core|Package' >> "$LOGFILE"
 
 echo >> "$LOGFILE"
-echo "GPU (start):" >> "$LOGFILE"
-nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used \
-    --format=csv,noheader,nounits | tr -d ',' >> "$LOGFILE"
-
-echo >> "$LOGFILE"
-echo "Running ./main..." >> "$LOGFILE"
 start=$(date +%s)
 
 /home/user/project/build/project "$N" "$K" "$LS" "$BS" "$dev" & PID=$!
@@ -31,7 +22,7 @@ done
 rm -f start_measure
 echo >> "$LOGFILE"
 echo "Time(s) CPU_Temp GPU_Temp GPU_Util GPU_Mem CPU_Util CPU_Mem" >> "$LOGFILE"
-
+#need only the last ones at the end, the temps and everything else
 while kill -0 "$PID" 2>/dev/null; do
     now=$(( $(date +%s) - start ))
 
@@ -68,12 +59,3 @@ end=$(date +%s)
 echo >> "$LOGFILE"
 echo "End time: $(date)" >> "$LOGFILE"
 echo "Execution time: $((end - start)) seconds" >> "$LOGFILE"
-
-echo >> "$LOGFILE"
-echo "CPU (end):" >> "$LOGFILE"
-sensors | grep -E 'Core|Package' >> "$LOGFILE"
-
-echo >> "$LOGFILE"
-echo "GPU (end):" >> "$LOGFILE"
-nvidia-smi --query-gpu=temperature.gpu,power.draw,utilization.gpu,memory.used \
-    --format=csv,noheader,nounits | tr -d ',' >> "$LOGFILE"

@@ -60,8 +60,8 @@ void Map::runkernel(sycl::queue& q,size_t lsize) const {
     }).wait();
 }
 
-Reduce::Reduce(Mapped* _mappedw, size_t _N)
-    : mappedw(_mappedw), N(_N) {}
+Reduce::Reduce(Mapped* _mappedw, size_t _rN)
+    : mappedw(_mappedw), rN(_rN) {}
 
 bool Reduce::lex_compare(const Mapped &a, const Mapped &b) {
     for (int i = 0; i < MAXK; ++i) {
@@ -75,10 +75,10 @@ void Reduce::operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,
                         int* result) const {
     size_t gid = it.get_global_id(0);
-    size_t mapped_size = N;
-
+    size_t mapped_size = rN;
+    if (gid >= rN) return; 
     if (gid > 0) {
-        bool is_last = (gid == N - 1);
+        bool is_last = (gid == rN - 1);
         if (!is_last) {
             for (int j = 0; j < MAXK; ++j) {
                 char a = mappedw[gid].word[j];
@@ -119,9 +119,9 @@ void Reduce::operator()(sycl::nd_item<1> it,
         } 
     }
 
-    constexpr int blocksize = 64;
+    constexpr int blocksize = 512;
     size_t lid = it.get_local_id(0);
-    shared[lid] = (gid < N && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
+    shared[lid] = (gid < rN && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
     it.barrier(sycl::access::fence_space::local_space);
 
     for (size_t s = blocksize / 2; s > 0; s >>= 1) {
@@ -139,11 +139,11 @@ void Reduce::operator()(sycl::nd_item<1> it,
 }
 
 void Reduce::runkernel(int* result, sycl::queue& q,size_t lsize) const {
-        std::stable_sort(mappedw, mappedw + N,
+        std::stable_sort(mappedw, mappedw + rN,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
     size_t local_size = lsize;
-    size_t global_size = ((N + local_size - 1) / local_size) * local_size;
+    size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
             auto self =(*this);
     q.submit([&](sycl::handler& h) {
@@ -156,17 +156,17 @@ void Reduce::runkernel(int* result, sycl::queue& q,size_t lsize) const {
 
 
 void Reduce::seqRed(Mapped* mappedw, size_t* newsize, size_t s) {
-    if (N == 0) {
+    if (rN == 0) {
         *newsize = 0;
         return;
     }
 
-    std::stable_sort(mappedw, mappedw + N,
+    std::stable_sort(mappedw, mappedw + rN,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
     int t = 0;  
 
-    for (int i = 1; i < N; ++i) {
+    for (int i = 1; i < rN; ++i) {
         if (std::strcmp(mappedw[i].word, mappedw[t].word) == 0) {
             mappedw[t].v += mappedw[i].v; 
         } else {

@@ -35,9 +35,9 @@ namespace CPU {
 
     struct Reduce {
         Mapped* mappedw;
-        size_t N;
+        size_t rN;
 
-        Reduce(Mapped* _mappedw, size_t _N);
+        Reduce(Mapped* _mappedw, size_t _rN);
         static bool lex_compare(const Mapped &a, const Mapped &b);
         void operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared,

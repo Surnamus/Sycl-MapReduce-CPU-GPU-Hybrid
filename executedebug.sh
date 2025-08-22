@@ -22,13 +22,12 @@ else
     gdb ./$TARGET
 fi
 cd ..
-
+./scripts/outcleaner.sh < /dev/null
 ./scripts/decompressor.sh < /dev/null
 ./scripts/modifier.sh < /dev/null
 ./scripts/truncator.sh  "$N"  < /dev/null
-./scripts/outcleaner.sh < /dev/null
 python3 ./scripts/solutiongenerator.py "$N" "$K" "$LS" "$BS" 
-./scripts/testsuite.sh "$N" "$K" "$LS" "$BS" "$dev" < /dev/null
+./scripts/testsuite.sh "$N" "$K" "$LS" "$BS" "$dev" 
 python3 ./scripts/verifier.py
 
 #python3 ./scripts/plotter.py "$dev"

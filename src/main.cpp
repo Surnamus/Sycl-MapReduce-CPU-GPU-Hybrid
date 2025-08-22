@@ -34,6 +34,8 @@ void run() {
     f << "go\n";
     f.close();
 }
+
+// Safe printer for CPU::Mapped (uses bounded length)
 void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
     std::ofstream out("/home/user/project/output.txt"); // hardcoded output file
     if (!out) {
@@ -82,15 +84,15 @@ int main(int argc, char* argv[]) {
     }
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
-    std::vector<std::string> dataset_used = dataset_selector(datav);
-
-    std::cin.clear();
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    //std::vector<std::string> dataset_used = dataset_selector(datav);
+    //std::vector<std::string> dataset_used = datav;
+    //std::cin.clear();
+    //std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
     std::tuple<sycl::device, int> dev = Program_device_selector();
     sycl::queue q{std::get<0>(dev)}; 
 
-    auto datadev = convert(dataset_used);
+    auto datadev = convert(datav);
     //int k = MAXK;
      
 
@@ -156,6 +158,7 @@ int main(int argc, char* argv[]) {
         print_mapped_counts(mappedwm,setsize, k);
     }
     else {
+    // Select devices
         sycl::queue gpu_q{sycl::gpu_selector{}};
         sycl::queue cpu_q{sycl::cpu_selector{}};
         q_used = gpu_q; 
@@ -176,12 +179,12 @@ int main(int argc, char* argv[]) {
         gpu_q.wait();
         size_t lssc = std::atoi(argv[4]);
         localsize=lssc;
-        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), N);
+        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         
         reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
         print_mapped_counts(mappedwm,setsize, k);
-    }
+        }
 
    // int total_unique = 0;
    // for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;

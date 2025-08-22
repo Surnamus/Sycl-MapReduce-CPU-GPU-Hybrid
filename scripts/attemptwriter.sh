@@ -16,7 +16,7 @@ STATUS="$6"
 
 # Determine next attempt number by counting existing attempts in the log
 if [ -f "$LOGFILE" ]; then
-    attempt=$(( $(grep -c '^Attempt' "$LOGFILE") + 1 ))
+    attempt=$(( $(grep -c '^Attempt [0-9]\+: N=' "$LOGFILE") + 1 ))
 else
     attempt=1
 fi

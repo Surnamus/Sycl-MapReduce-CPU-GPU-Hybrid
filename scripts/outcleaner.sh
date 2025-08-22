@@ -3,6 +3,7 @@
 # Files to clear
 file1="/home/user/project/output.txt"
 file2="/home/user/project/verifyme.txt"
+file3="/home/user/project/points.txt"
 
 # Truncate the files
 truncate -s 0 "$file1" "$file2"

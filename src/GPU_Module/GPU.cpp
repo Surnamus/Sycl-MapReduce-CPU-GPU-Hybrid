@@ -62,7 +62,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
                         int* result) const {
     size_t gid = it.get_global_id(0);
     size_t mapped_size = rN;
-
+    if (gid >= rN) return; 
     if (gid > 0) {
         bool is_last = (gid == rN - 1);
         if (!is_last) {

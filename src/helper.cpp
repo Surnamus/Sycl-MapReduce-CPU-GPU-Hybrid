@@ -49,7 +49,6 @@ std::vector<std::string> prepare() {
 std::vector<std::string> dataset_selector(std::vector<std::string>& data) {
     std::vector<std::string> selected_data;
     std::string line;
-
     std::cout << "Dataset size is " << data.size()
               << ". Enter indices one per line (0 to " 
               << (data.size() ? data.size()-1 : 0)
