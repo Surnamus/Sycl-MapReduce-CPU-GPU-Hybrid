@@ -5,14 +5,7 @@ K="$2"
 LS="$3"
 BS="$4"
 dev="$5"
-mkdir -p build
-cd build
 
-rm -rf ./*
-
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . --parallel 4
-cd ..
 ./scripts/outcleaner.sh < /dev/null
 ./scripts/decompressor.sh < /dev/null
 ./scripts/modifier.sh < /dev/null

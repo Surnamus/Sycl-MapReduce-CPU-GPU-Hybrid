@@ -102,6 +102,7 @@ read -a bs
 echo "the second case, input the localizes for cpu (up to 512), same size as bsc:"
 read -a bsc
 
+rm -rf build/* && cmake -B build -S . -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 4
 
 run_experiments "$N_start" "$increment" "$NumberOfNs" "$metric" Karr[@] localsizearr[@] localsizearrcpuhyb[@]
 
