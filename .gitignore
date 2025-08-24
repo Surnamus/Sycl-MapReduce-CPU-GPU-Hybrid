@@ -4,3 +4,5 @@ dataset/
 debug/
 results/
 *.zip
+output.txt
+verifyme.txt
