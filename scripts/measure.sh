@@ -20,19 +20,25 @@ echo "----" >> "$LOGFILE"
 echo "Run start: $(date) — args: N=$N K=$K LS=$LS BS=$BS dev=$dev met=$met" >> "$LOGFILE"
 
 # --- Main Program Execution ---
-#start_time=$(date +%s)
-# Run the program and redirect its stdout/stderr to the log to keep our output clean
-    
-#device="$dev" "/home/user/project/build/project" "$N" "$K" "$LS" "$BS" "$dev" >> "$LOGFILE" 2>&1 || true
+# Run the program in the background. It is expected to create 'start_measure' and 'stop' files.
+env device="$dev" "/home/user/project/build/project" "$N" "$K" "$LS" "$BS" "$dev" >> "$LOGFILE" 2>&1 &
 
-#exec_time=$((end_time - start_time))
-exec_time=$(
-    { /usr/bin/time -f "%e" env device="$dev" /home/user/project/build/project "$N" "$K" "$LS" "$BS" "$dev"; } 2>&1 \
-    | tee -a "$LOGFILE" \
-    | tail -n 1 | awk '{printf "%.3f", $1*1000}'
-)
+# --- Wait for start_measure ---
+while [ ! -f start_measure ]; do
+    sleep 0.001
+done
+start_time_ns=$(date +%s%N)
 
-end_time=$(date +%s)
+# --- Wait for stop ---
+while [ ! -f stop ]; do
+    sleep 0.001
+done
+end_time_ns=$(date +%s%N)
+
+# --- High-Precision Time Calculation ---
+# Use awk for floating-point arithmetic to get a precise duration in milliseconds.
+exec_time=$(awk -v start="$start_time_ns" -v end="$end_time_ns" 'BEGIN { printf "%.3f", (end - start) / 1000000 }')
+
 
 # --- Metric Collection (with robust error handling) ---
 
@@ -62,7 +68,7 @@ cpu_util=${cpu_util:-0}
 cpu_mem=$(free -m 2>/dev/null | awk '/Mem:/ {print $3}' || echo "0")
 cpu_mem=${cpu_mem:-0}
 
-# --- Full Log EnAtry ---
+# --- Full Log Entry ---
 printf "exec_time=%s cpu_temp=%s gpu_temp=%s gpu_util=%s gpu_mem=%s cpu_util=%s cpu_mem=%s\n" \
     "$exec_time" "$cpu_temp" "$gpu_temp" "$gpu_util" "$gpu_mem" "$cpu_util" "$cpu_mem" >> "$LOGFILE"
 

@@ -27,11 +27,12 @@ run_experiments() {
 
   POINTS_FILE="/home/user/project/points.txt"
   truncate -s 0 "$POINTS_FILE"
-
+  file4="/home/user/project/logs/measurements.log"
   for k in "${Karr[@]}"; do
     local N="$N_start"
     local Ncount="$NumberOfNs"
     truncate -s 0 "$file3"
+    #truncate -s 0 "$file4"  
     while [ "$Ncount" -gt 0 ]; do
       local idx=$(( NumberOfNs - Ncount ))
       local localsize_elem="${localsizearr[$idx]}"
@@ -50,6 +51,7 @@ run_experiments() {
 
       N=$(( N + increment ))
       Ncount=$(( Ncount - 1 ))
+      truncate -s 0 "$file4"  
     done
         if [ "$increment" -eq 0 ]; then
     # Create new empty arrays to hold the repeated values
@@ -104,3 +106,7 @@ read -a bsc
 run_experiments "$N_start" "$increment" "$NumberOfNs" "$metric" Karr[@] localsizearr[@] localsizearrcpuhyb[@]
 
 run_experiments "$N_start" 0 "${#bs[@]}" "$metric" Karr[@] bs[@] bsc[@]
+
+    truncate -s 0 "$file3"
+    truncate -s 0 "$file4"  
+    ./scripts/outcleaner.sh

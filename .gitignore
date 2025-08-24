@@ -2,4 +2,5 @@
 /build/
 dataset/
 debug/
+results/
 *.zip

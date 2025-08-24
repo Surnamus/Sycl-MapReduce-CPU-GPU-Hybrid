@@ -34,7 +34,11 @@ void run() {
     f << "go\n";
     f.close();
 }
-
+void stop() {
+    std::ofstream f("stop");
+    f << "done\n";
+    f.close();
+}
 // Safe printer for CPU::Mapped (uses bounded length)
 void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
     std::ofstream out("/home/user/project/output.txt"); // hardcoded output file
@@ -113,14 +117,10 @@ int main(int argc, char* argv[]) {
               << q.get_device().get_info<sycl::info::device::name>()<<"\n" ; 
     if (std::get<1>(dev) == 1) {
         q_used = q;
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
-        std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
+        flat_data = sycl::malloc_device<char>(datadev.first.size() + 1, q_used);
+        q_used.memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
-        for (size_t i = 0; i < setsize; ++i) {
-            mappedwm[i].v = 0;
-            std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
-        }
+        mappedwm = sycl::malloc_device<GPU::Mapped>(setsize, q_used);
 
         run();
         GPU::Map mapf(flat_data, N, k);
@@ -131,7 +131,12 @@ int main(int argc, char* argv[]) {
         GPU::Reduce reducef(mappedwm, setsize);
         reducef.runkernel(result, q,localsize);
         q.wait();
-        print_mapped_counts(mappedwm, setsize, k);
+        stop();
+
+        std::vector<GPU::Mapped> host_mapped(setsize);
+
+        q_used.memcpy(host_mapped.data(), mappedwm, setsize * sizeof(GPU::Mapped)).wait();
+        print_mapped_counts(host_mapped.data(), setsize, k);
         
     }
     else if (std::get<1>(dev) == 2) {
@@ -154,6 +159,7 @@ int main(int argc, char* argv[]) {
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
            reducef.runkernel(result,q,localsize);
             q.wait();
+            stop();
         //reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
         print_mapped_counts(mappedwm,setsize, k);
     }
@@ -183,6 +189,7 @@ int main(int argc, char* argv[]) {
         
         reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
+        stop();
         print_mapped_counts(mappedwm,setsize, k);
         }
 
@@ -194,5 +201,8 @@ int main(int argc, char* argv[]) {
     sycl::free(result, q_used); 
 }
 
-
+//gpu device
+//cpu doesnt matter
+//hybrid shared
+//better way to measure time using run command in cpp and then use time in some way
 
