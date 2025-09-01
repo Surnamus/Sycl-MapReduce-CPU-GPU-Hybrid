@@ -160,8 +160,8 @@ void Reduce::seqRed(Mapped* mappedw, size_t* newsize, size_t s) {
         *newsize = 0;
         return;
     }
-
-    std::stable_sort(mappedw, mappedw + rN,
+    //added parralel execution policy
+    std::stable_sort(std::execution::par,mappedw, mappedw + rN,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
     int t = 0;  

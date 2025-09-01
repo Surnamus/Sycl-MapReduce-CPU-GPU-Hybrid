@@ -20,3 +20,8 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/CPU_Module
     ${PROJECT_SOURCE_DIR}/src/Hybrid_CPU_GPU
 )
+
+set(ENV{ACPP_ADAPTIVITY_LEVEL} "0")
+
+# Optional: make it visible in build logs
+message(STATUS "AdaptiveCpp JIT optimizations disabled (ACPP_ADAPTIVITY_LEVEL=0)")

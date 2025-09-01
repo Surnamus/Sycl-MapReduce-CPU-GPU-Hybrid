@@ -73,7 +73,7 @@ def generate_plot(x_data, y_data, dev_list, x_label, y_label, title, metric_name
     for dev_id in sorted(plot_data.keys()):
         if plot_data[dev_id]['x']:
             ax.scatter(plot_data[dev_id]['x'], plot_data[dev_id]['y'], 
-                        label=plot_data[dev_id]['label'], marker=plot_data[dev_id]['marker'])
+                        label=plot_data[dev_id]['label'], marker=plot_data[dev_id]['marker'], s=2)
 
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)

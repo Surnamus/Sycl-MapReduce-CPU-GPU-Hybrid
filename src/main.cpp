@@ -117,46 +117,55 @@ int main(int argc, char* argv[]) {
               << q.get_device().get_info<sycl::info::device::name>()<<"\n" ; 
     if (std::get<1>(dev) == 1) {
         q_used = q;
-        flat_data = sycl::malloc_device<char>(datadev.first.size() + 1, q_used);
-        q_used.memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
+        flat_data = sycl::malloc_device<char>(datadev.first.size() + 1, q);
+        q.memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_device<GPU::Mapped>(setsize, q_used);
-
-        run();
+        mappedwm = sycl::malloc_device<GPU::Mapped>(setsize, q);
+        //run();
         GPU::Map mapf(flat_data, N, k);
         mapf.mappedw = mappedwm;
+        q.wait();
+        
+        run();
         mapf.runkernel(q,localsize);
         q.wait();
+        stop();
+        
 
         GPU::Reduce reducef(mappedwm, setsize);
+        q.wait();
+        run();
         reducef.runkernel(result, q,localsize);
         q.wait();
         stop();
 
         std::vector<GPU::Mapped> host_mapped(setsize);
 
-        q_used.memcpy(host_mapped.data(), mappedwm, setsize * sizeof(GPU::Mapped)).wait();
+        q.memcpy(host_mapped.data(), mappedwm, setsize * sizeof(GPU::Mapped)).wait();
         print_mapped_counts(host_mapped.data(), setsize, k);
         
     }
     else if (std::get<1>(dev) == 2) {
         q_used = q;
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
+        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q);
         for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
-        run();
+        //run();
         CPU::Map mapf(flat_data, N, k);
         mapf.mappedw = reinterpret_cast<CPU::Mapped*>(mappedwm);
+        run();
         mapf.runkernel(q,localsize);
         q.wait();
+        stop();
 
-        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
+        CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize);
+        run(); //N
            reducef.runkernel(result,q,localsize);
             q.wait();
             stop();
@@ -169,24 +178,25 @@ int main(int argc, char* argv[]) {
         sycl::queue cpu_q{sycl::cpu_selector{}};
         q_used = gpu_q; 
 
-        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, q_used);
+        flat_data = sycl::malloc_shared<char>(datadev.first.size() + 1, gpu_q);
         std::memcpy(flat_data, datadev.first.data(), datadev.first.size() + 1);
 
-        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, q_used);
+        mappedwm = sycl::malloc_shared<GPU::Mapped>(setsize, gpu_q);
         for (size_t i = 0; i < setsize; ++i) {
             mappedwm[i].v = 0;
             std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
         }
 
-        run();
         GPU::Map mapf(flat_data, N, k);
         mapf.mappedw = mappedwm;
+        run();
         mapf.runkernel(gpu_q,localsize);
         gpu_q.wait();
+        stop();
         size_t lssc = std::atoi(argv[4]);
         localsize=lssc;
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
-        
+        run();
         reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
         stop();
@@ -196,9 +206,9 @@ int main(int argc, char* argv[]) {
    // int total_unique = 0;
    // for (size_t i = 0; i < setsize; ++i) if (mappedwm[i].v > 0) total_unique += mappedwm[i].v;
     std::cout<<"check output.txt in /home/user/project/output.txt"<<std::endl;
-    sycl::free(flat_data, q_used);
-    sycl::free(mappedwm, q_used);
-    sycl::free(result, q_used); 
+    sycl::free(flat_data, q);
+    sycl::free(mappedwm, q);
+    sycl::free(result, q); 
 }
 
 //gpu device

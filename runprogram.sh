@@ -3,6 +3,7 @@ set -euo pipefail
 
 # pad_array utility
 file3="/home/user/project/points.txt"
+RAWFILE="/home/user/project/DATA.txt"
 
 pad_array() {
   local -n arr=$1
@@ -21,12 +22,20 @@ run_experiments() {
   local -a Karr=("${!1}")
   local -a localsizearr=("${!2}")
   local -a localsizearrcpuhyb=("${!3}")
-
   pad_array localsizearr "$NumberOfNs"
   pad_array localsizearrcpuhyb "$NumberOfNs"
-
   POINTS_FILE="/home/user/project/points.txt"
   truncate -s 0 "$POINTS_FILE"
+  #because the program is using JIT compiler, compile for zero in the first run so that compiler
+  #optimises itself properly and then actually start using the Nstart
+  for k in "${Karr[@]}"; do
+    for device in 1 2 3; do
+      echo "first run to get rid of JIT warning"
+      #big N
+      ./execute.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
+      val=$(./scripts/measure.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" "$metric")
+    done
+  done
   file4="/home/user/project/logs/measurements.log"
   for k in "${Karr[@]}"; do
     local N="$N_start"
@@ -37,7 +46,6 @@ run_experiments() {
       local idx=$(( NumberOfNs - Ncount ))
       local localsize_elem="${localsizearr[$idx]}"
       local localsizecpu_elem="${localsizearrcpuhyb[$idx]}"
-
       for device in 1 2 3; do
         echo "Running with N=$N, K=$k, LS=$localsize_elem, BS=$localsizecpu_elem, dev=$device..."
 
@@ -47,6 +55,9 @@ run_experiments() {
 
         printf "%s %s %s %s %s %s %s\n" \
           "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$POINTS_FILE"
+                printf "%s %s %s %s %s %s %s\n" \
+          "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$RAWFILE"
+
       done
 
       N=$(( N + increment ))
@@ -67,7 +78,6 @@ run_experiments() {
         idx=$((idx + 1))
     done
 
-    # Convert the new, expanded arrays into space-separated strings for the plotter
     localsize_elem_str="${expanded_ls[*]}"
     localsizecpu_elem_str="${expanded_lscpu[*]}"
 
@@ -75,6 +85,7 @@ run_experiments() {
     else
     python3 ./scripts/paramplotter.py "$POINTS_FILE" "$metric" "$increment" "$k" "$localsize_elem" "$localsizecpu_elem"
     fi
+    printf "%s"  "----\n" >> "$RAWFILE"
   done
 
   echo "Done. All data points written to: $POINTS_FILE"
@@ -103,11 +114,11 @@ echo "the second case, input the localizes for cpu (up to 512), same size as bsc
 read -a bsc
 
 rm -rf build/* && cmake -B build -S . -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 4
-
+printf "BEGIN" >> "$RAWFILE"
 run_experiments "$N_start" "$increment" "$NumberOfNs" "$metric" Karr[@] localsizearr[@] localsizearrcpuhyb[@]
-
+printf "....."
 run_experiments "$N_start" 0 "${#bs[@]}" "$metric" Karr[@] bs[@] bsc[@]
-
+printf "END">>"$RAWFILE"
     truncate -s 0 "$file3"
     truncate -s 0 "$file4"  
     ./scripts/outcleaner.sh
