@@ -23,5 +23,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 set(ENV{ACPP_ADAPTIVITY_LEVEL} "0")
 
-# Optional: make it visible in build logs
 message(STATUS "AdaptiveCpp JIT optimizations disabled (ACPP_ADAPTIVITY_LEVEL=0)")
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+    -O3                 # aggressive optimizations
+    -fstrict-aliasing   # allow strict aliasing assumptions
+    -funroll-loops      # loop unrolling
+    -ftree-vectorize    # enable auto-vectorization
+    -fopenmp-simd       # allow OpenMP SIMD optimizations
+    -fno-math-errno     # avoid math() setting errno overhead
+    -ffp-contract=fast  # allow fused multiply-add where safe
+    -march=x86-64-v3    # portable modern x86 baseline (adjust if needed)
+)

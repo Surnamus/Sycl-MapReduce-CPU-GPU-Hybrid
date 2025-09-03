@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+
+
+#DONT USE FILES USE SIGNALS AND PASS THEM FROM CPP
+
+
+
 # usage: ./measure_fix.sh N K LS BS dev met
 N="$1" K="$2" LS="$3" BS="$4" dev="$5" met="$6"
 

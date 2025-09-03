@@ -34,7 +34,9 @@ void run() {
     f << "go\n";
     f.close();
 }
-void stop() {
+void stop(sycl::queue &q)
+ {
+    q.wait();                  
     std::ofstream f("stop");
     f << "done\n";
     f.close();
@@ -129,7 +131,7 @@ int main(int argc, char* argv[]) {
         run();
         mapf.runkernel(q,localsize);
         q.wait();
-        stop();
+        stop(q);
         
 
         GPU::Reduce reducef(mappedwm, setsize);
@@ -137,7 +139,7 @@ int main(int argc, char* argv[]) {
         run();
         reducef.runkernel(result, q,localsize);
         q.wait();
-        stop();
+        stop(q);
 
         std::vector<GPU::Mapped> host_mapped(setsize);
 
@@ -162,13 +164,13 @@ int main(int argc, char* argv[]) {
         run();
         mapf.runkernel(q,localsize);
         q.wait();
-        stop();
+        stop(q);
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize);
         run(); //N
            reducef.runkernel(result,q,localsize);
             q.wait();
-            stop();
+            stop(q);
         //reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
         print_mapped_counts(mappedwm,setsize, k);
     }
@@ -192,14 +194,14 @@ int main(int argc, char* argv[]) {
         run();
         mapf.runkernel(gpu_q,localsize);
         gpu_q.wait();
-        stop();
+        stop(q);
         size_t lssc = std::atoi(argv[4]);
         localsize=lssc;
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         run();
         reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
-        stop();
+        stop(q);
         print_mapped_counts(mappedwm,setsize, k);
         }
 
