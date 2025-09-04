@@ -1,57 +1,68 @@
 #!/bin/bash
 set -euo pipefail
+# usage: ./measure.sh N K LS BS dev met
 
+#FIX SO THAT IT ISNT TOO FAST
+N="$1"
+K="$2"
+LS="$3"
+BS="$4"
+dev="$5"
+met="$6"
 
-
-#DONT USE FILES USE SIGNALS AND PASS THEM FROM CPP
-
-
-
-# usage: ./measure_fix.sh N K LS BS dev met
-N="$1" K="$2" LS="$3" BS="$4" dev="$5" met="$6"
-
-# Validate metric index (we keep same ordering; 0=time)
+# Validate metric index (0=time, 1..6 other metrics)
 if ! [[ "$met" =~ ^[0-6]$ ]]; then
     echo "Warning: invalid metric index '$met' - defaulting to 0 (time)" >&2
     met=0
 fi
 
-# Ensure no stale marker files remain (remove, do not create any new files)
-rm -f start_measure stop
+# --- Cleanup trap ---
+fifo="/tmp/prog_out.$$"
+bg_pid=""
+cleanup() {
+    exec 3<&- 2>/dev/null || true
+    [[ -n "$bg_pid" ]] && kill "$bg_pid" 2>/dev/null || true
+    rm -f "$fifo"
+}
+trap cleanup EXIT
 
-# Launch program in background (redirect output to /dev/null so we don't create files)
-env device="$dev" "/home/user/project/build/project" "$N" "$K" "$LS" "$BS" "$dev" >/dev/null &
-bg_pid=$!
+# Wait for a specific string from the program output (line-based, non-busy)
+wait_for_signal() {
+    local target="$1"
+    local line
+    while true; do
+        # try to read a full line with a short timeout
+        if read -r -t 0.2 line <&3 2>/dev/null; then
+            # strip possible CR
+            line="${line%%$'\r'}"
+            if [[ "$line" == *"$target"* ]]; then
+                return 0
+            fi
+            # otherwise continue reading
+            continue
+        fi
 
-# Helper: wait for one start/stop pair and print a single metric value
+        # no data currently available: check whether the background process is still alive
+        if ! kill -0 "$bg_pid" 2>/dev/null; then
+            # program exited and we have no more input
+            return 1
+        fi
+
+        # still running, loop again
+    done
+}
+
+# One START/STOP pair → one metric value
 measure_phase() {
-    # wait for start_measure (exit if bg process died)
-    while [ ! -f start_measure ]; do
-        sleep 0.001
-        if ! kill -0 "$bg_pid" 2>/dev/null; then
-            return 1
-        fi
-    done
+    if ! wait_for_signal "START"; then return 1; fi
+    start_time=$(date +%s.%N)
+    if ! wait_for_signal "STOP"; then return 1; fi
+    end_time=$(date +%s.%N)
 
-    # record start and remove the marker (no other files are created)
-    start_time_ns=$(date +%s%N)
-    rm -f start_measure
+    # Exec time in milliseconds, full precision
+    exec_time=$(awk -v s="$start_time" -v e="$end_time" 'BEGIN { printf "%.17f", (e - s) * 1000 }')
 
-    # wait for stop (exit if bg process died)
-    while [ ! -f stop ]; do
-        sleep 0.001
-        if ! kill -0 "$bg_pid" 2>/dev/null; then
-            return 1
-        fi
-    done
-
-    end_time_ns=$(date +%s%N)
-    rm -f stop
-
-    # precise, consistently formatted exec time in milliseconds (3 decimal places)
-    exec_time=$(awk -v s="$start_time_ns" -v e="$end_time_ns" 'BEGIN { printf "%.3f", (e - s) / 1000000 }')
-
-    # parse other metrics (best-effort) without creating files
+    # CPU/GPU metrics in full precision (best-effort)
     cpu_temp=$(sensors 2>/dev/null | grep -E 'Tctl|Package id 0|CPU Temp' | head -n1 | awk '{print $2}' | sed 's/+//; s/°C//' || echo "0")
     cpu_temp=${cpu_temp:-0}
 
@@ -59,8 +70,8 @@ measure_phase() {
     if [[ -n "$_GPU_RAW" ]]; then
         IFS=',' read -r raw_gpu_temp raw_gpu_util raw_gpu_mem <<< "$_GPU_RAW"
         gpu_temp=$(echo "$raw_gpu_temp" | tr -d '[:space:]')
-        gpu_util=$(echo "$raw_gpu_util" | tr -d '[:space:]' | sed 's/%//')
-        gpu_mem=$(echo "$raw_gpu_mem" | tr -d '[:space:]' | sed 's/MiB//; s/ MiB//')
+        gpu_util=$(echo "$raw_gpu_util" | tr -d '[:space:]')
+        gpu_mem=$(echo "$raw_gpu_mem" | tr -d '[:space:]')
     else
         gpu_temp=0; gpu_util=0; gpu_mem=0
     fi
@@ -75,24 +86,36 @@ measure_phase() {
     printf "%s\n" "${metrics[$met]}"
 }
 
-# Collect per-phase values in-memory (bash array)
+# --- MAIN ---
+
+# ensure no stale fifo
+rm -f "$fifo"
+mkfifo "$fifo"
+
+# run program with device env var and line-buffered output so START/STOP aren't stuck in stdio buffers
+env device="$dev" stdbuf -oL -eL "/home/user/project/build/project" "$N" "$K" "$LS" "$BS" "$dev" >"$fifo" 2>&1 &
+bg_pid=$!
+
+exec 3<"$fifo"
+rm -f "$fifo"
+
 vals=()
 while kill -0 "$bg_pid" 2>/dev/null; do
-    val=$(measure_phase) || break
-    if [[ -n "$val" ]]; then
-        vals+=( "$val" )
-    else
+    if ! val=$(measure_phase); then
         break
     fi
+    vals+=( "$val" )
 done
 
-# If no measurements, print 0
+wait "$bg_pid" 2>/dev/null || true
+
 if [ "${#vals[@]}" -eq 0 ]; then
+    # keep behaviour of returning "0" but print a hint to stderr for debugging
+    echo "No measurements collected (program may have exited before producing START/STOP)." >&2
     echo "0"
     exit 0
 fi
 
-# Sum measurements using awk reading from STDIN (no files created)
-TOTAL=$(printf "%s\n" "${vals[@]}" | awk '{ sum += $1 } END { printf "%.3f", sum }')
-
+# Sum all measurements with full precision
+TOTAL=$(printf "%s\n" "${vals[@]}" | awk '{ sum += $1 } END { printf "%.17f", sum }')
 echo "$TOTAL"

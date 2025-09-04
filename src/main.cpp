@@ -11,7 +11,8 @@
 #include "CPU.h"
 #include <unordered_set>
 #include <string>
-
+//#include <thread>   
+//#include <chrono>   
 namespace sycl = cl::sycl;
 constexpr int MAXK=3;
 void print_mapped_countst(GPU::Mapped* mappedw, size_t setsize, int k) {
@@ -30,16 +31,14 @@ int compute_unique_total(GPU::Mapped* mappedw, size_t setsize) {
     return total;
 }
 void run() {
-    std::ofstream f("start_measure");
-    f << "go\n";
-    f.close();
+    std::cout << "START" << std::endl;
+    std::cout.flush();
 }
 void stop(sycl::queue &q)
  {
     q.wait();                  
-    std::ofstream f("stop");
-    f << "done\n";
-    f.close();
+    std::cout << "STOP" << std::endl;
+    std::cout.flush();
 }
 // Safe printer for CPU::Mapped (uses bounded length)
 void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
@@ -88,6 +87,11 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " N K LS BS\n";
         return 1;
     }
+
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+
+
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
     //std::vector<std::string> dataset_used = dataset_selector(datav);
@@ -194,14 +198,14 @@ int main(int argc, char* argv[]) {
         run();
         mapf.runkernel(gpu_q,localsize);
         gpu_q.wait();
-        stop(q);
+        stop(gpu_q);
         size_t lssc = std::atoi(argv[4]);
         localsize=lssc;
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         run();
         reducef.runkernel(result, cpu_q,localsize);
         cpu_q.wait();
-        stop(q);
+        stop(cpu_q);
         print_mapped_counts(mappedwm,setsize, k);
         }
 
@@ -213,8 +217,4 @@ int main(int argc, char* argv[]) {
     sycl::free(result, q); 
 }
 
-//gpu device
-//cpu doesnt matter
-//hybrid shared
-//better way to measure time using run command in cpp and then use time in some way
 
