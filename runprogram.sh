@@ -30,10 +30,10 @@ run_experiments() {
   #optimises itself properly and then actually start using the Nstart
   for k in "${Karr[@]}"; do
     for device in 1 2 3; do
-      echo "first run to get rid of JIT warning"
+      echo "first runs, they iterate over K, get rid of JIT warning"
       #big N
       ./execute.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
-      val=$(./scripts/measure.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" "$metric")
+     /home/user/project/build/project 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" #>"$fifo" 2>&1 & bg_pid=$!
     done
   done
   file4="/home/user/project/logs/measurements.log"
