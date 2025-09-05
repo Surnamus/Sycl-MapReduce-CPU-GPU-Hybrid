@@ -5,10 +5,11 @@ import os
 import sys
 import time
 import subprocess
-import tempfile
 import shutil
 from decimal import Decimal, getcontext
 from typing import Tuple, Optional
+
+import pynvml
 
 getcontext().prec = 30
 
@@ -85,48 +86,26 @@ def read_mem_used_mb() -> int:
     return used_kb // 1024
 
 
-def start_nvidia_logger(nvlog_path: str, poll_ms: int = 100) -> Optional[subprocess.Popen]:
-    if shutil.which('nvidia-smi') is None:
-        return None
-    cmd = [
-        'nvidia-smi',
-        '--query-gpu=temperature.gpu,utilization.gpu,memory.used',
-        '--format=csv,noheader,nounits',
-        '-lms', str(poll_ms)
-    ]
-    try:
-        f = open(nvlog_path, 'w')
-        p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.DEVNULL)
-        return p
-    except Exception:
-        return None
+gpu_handle = None
+try:
+    pynvml.nvmlInit()
+    if pynvml.nvmlDeviceGetCount() > 0:
+        gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+except Exception:
+    gpu_handle = None
 
 
-def nvlog_last_line(nvlog_path: str) -> str:
-    if not os.path.exists(nvlog_path):
-        return ''
+def read_gpu_metrics() -> tuple[int, int, int]:
+    """Return (gpu_temp, gpu_util, gpu_mem) or zeros if unavailable."""
+    if gpu_handle is None:
+        return 0, 0, 0
     try:
-        with open(nvlog_path, 'rb') as f:
-            f.seek(0, os.SEEK_END)
-            pos = f.tell()
-            if pos == 0:
-                return ''
-            line = b''
-            while pos > 0:
-                pos -= 1
-                f.seek(pos)
-                ch = f.read(1)
-                if ch == b'\n' and line:
-                    break
-                if ch != b'\n' and ch != b'\r':
-                    line = ch + line
-            try:
-                text = line.decode('utf-8', errors='ignore').strip()
-                return text
-            except Exception:
-                return ''
+        temp = pynvml.nvmlDeviceGetTemperature(gpu_handle, pynvml.NVML_TEMPERATURE_GPU)
+        util = pynvml.nvmlDeviceGetUtilizationRates(gpu_handle)
+        mem = pynvml.nvmlDeviceGetMemoryInfo(gpu_handle)
+        return int(temp), int(util.gpu), mem.used // (1024 * 1024)
     except Exception:
-        return ''
+        return 0, 0, 0
 
 
 def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Popen:
@@ -137,13 +116,19 @@ def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Po
         cmd = base_cmd
     env = os.environ.copy()
     env['device'] = device_env
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, bufsize=1, text=True)
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env=env,
+        bufsize=1,
+        text=True
+    )
     return p
 
 
-def measure_from_process(proc: subprocess.Popen, nvlog_path: Optional[str], met_index: int):
+def measure_from_process(proc: subprocess.Popen, met_index: int):
     vals: list[str] = []
-    bg_running = True
 
     def measure_phase_blocking() -> Optional[str]:
         try:
@@ -185,45 +170,17 @@ def measure_from_process(proc: subprocess.Popen, nvlog_path: Optional[str], met_
 
         cpu_mem = read_mem_used_mb()
 
-        gpu_temp = 0
-        gpu_util = 0
-        gpu_mem = 0
-        if nvlog_path and os.path.exists(nvlog_path):
-            line = nvlog_last_line(nvlog_path)
-            if line:
-                line_clean = ''.join(line.split())
-                parts = line_clean.split(',')
-                if len(parts) >= 3:
-                    try:
-                        gpu_temp = int(parts[0])
-                    except Exception:
-                        gpu_temp = 0
-                    try:
-                        gpu_util = int(parts[1])
-                    except Exception:
-                        gpu_util = 0
-                    try:
-                        gpu_mem = int(parts[2])
-                    except Exception:
-                        gpu_mem = 0
-        else:
-            if shutil.which('nvidia-smi'):
-                try:
-                    out = subprocess.check_output([
-                        'nvidia-smi',
-                        '--query-gpu=temperature.gpu,utilization.gpu,memory.used',
-                        '--format=csv,noheader,nounits'
-                    ], stderr=subprocess.DEVNULL, text=True)
-                    first = out.splitlines()[0].strip()
-                    parts = [p.strip() for p in first.split(',')]
-                    if len(parts) >= 3:
-                        gpu_temp = int(parts[0])
-                        gpu_util = int(parts[1])
-                        gpu_mem = int(parts[2])
-                except Exception:
-                    gpu_temp = gpu_util = gpu_mem = 0
+        gpu_temp, gpu_util, gpu_mem = read_gpu_metrics()
 
-        metrics = [f"{exec_time_ms:.17f}", str(gpu_util), str(cpu_util), str(gpu_mem), str(cpu_mem), str(gpu_temp), str(cpu_temp)]
+        metrics = [
+            f"{exec_time_ms:.17f}",
+            str(gpu_util),
+            str(cpu_util),
+            str(gpu_mem),
+            str(cpu_mem),
+            str(gpu_temp),
+            str(cpu_temp)
+        ]
         return metrics[met_index]
 
     while True:
@@ -236,28 +193,17 @@ def measure_from_process(proc: subprocess.Popen, nvlog_path: Optional[str], met_
     return vals
 
 
-tmp_dir = tempfile.mkdtemp(prefix='measure_py_')
-nvlog_path = os.path.join(tmp_dir, 'nvlog.txt')
-nv_proc = start_nvidia_logger(nvlog_path, poll_ms=100)
-
 binary = '/home/user/project/build/project'
 prog_args = [N, K, LS, BS, dev]
 try:
     prog = launch_program(binary, prog_args, dev)
 except FileNotFoundError:
     print(f"Error: program not found: {binary}", file=sys.stderr)
-    if nv_proc:
-        nv_proc.terminate()
     sys.exit(1)
 
 try:
-    vals = measure_from_process(prog, nvlog_path if nv_proc else None, met_i)
+    vals = measure_from_process(prog, met_i)
 finally:
-    if nv_proc:
-        try:
-            nv_proc.terminate()
-        except Exception:
-            pass
     try:
         prog.wait(timeout=1)
     except Exception:
@@ -266,7 +212,7 @@ finally:
         except Exception:
             pass
     try:
-        shutil.rmtree(tmp_dir)
+        pynvml.nvmlShutdown()
     except Exception:
         pass
 

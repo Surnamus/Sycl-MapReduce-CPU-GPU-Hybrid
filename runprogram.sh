@@ -51,8 +51,8 @@ run_experiments() {
 
         ./execute.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device"
 
-        val=$(./scripts/measure.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")
-
+        val=$(./scripts/measyrepy.py "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")
+        #val=$(./scripts/measure.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")
         printf "%s %s %s %s %s %s %s\n" \
           "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$POINTS_FILE"
                 printf "%s %s %s %s %s %s %s\n" \
