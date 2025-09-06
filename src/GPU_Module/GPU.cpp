@@ -58,8 +58,7 @@ Reduce::Reduce(Mapped* _mappedw, std::size_t _rN)
     : mappedw(_mappedw), rN(_rN) {}
 
 void Reduce::operator()(sycl::nd_item<1> it,
-                        sycl::local_accessor<int, 1> shared,
-                        int* result) const {
+                        sycl::local_accessor<int, 1> shared) const {
     size_t gid = it.get_global_id(0);
     size_t mapped_size = rN;
     if (gid >= rN) return; 
@@ -108,30 +107,12 @@ void Reduce::operator()(sycl::nd_item<1> it,
                     }
         }
     }
-
-    constexpr int blocksize = 512;
-    size_t lid = it.get_local_id(0);
-    shared[lid] = (gid < rN && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
-    it.barrier(sycl::access::fence_space::local_space);
-
-    for (size_t s = blocksize / 2; s > 0; s >>= 1) {
-        if (lid < s) shared[lid] += shared[lid + s];
-        it.barrier(sycl::access::fence_space::local_space);
-    }
-
-    if (lid == 0) {
-        sycl::atomic_ref<int,
-            sycl::memory_order::relaxed,
-            sycl::memory_scope::device,
-            sycl::access::address_space::global_space> afr(result[0]);
-        afr.fetch_add(shared[0]);
-    }
 }
 
 //here
 
-void Reduce::runkernel(int* result, sycl::queue q,size_t lsize) const {
-    size_t local_size = 512;
+void Reduce::runkernel( sycl::queue q,size_t lsize) const {
+    size_t local_size = lsize; //was 512
     size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
     
@@ -155,7 +136,7 @@ acpp::algorithms::sort(q,mappedw,mappedw+rN,cmp);
     q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
         h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
-            self(it, shared, result);
+            self(it, shared);
         });
     }).wait();
     //HERE

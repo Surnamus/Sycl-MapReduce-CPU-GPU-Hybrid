@@ -113,8 +113,7 @@ int main(int argc, char* argv[]) {
      N = datadev.first.size(); //avoid redefintion error
     size_t setsize = (N >= static_cast<size_t>(k)) ? (N - k + 1) : 0;
 
-    int* result = sycl::malloc_shared<int>(1, q);
-    *result = 0;
+    
 
     char* flat_data = nullptr;
     GPU::Mapped* mappedwm = nullptr;
@@ -141,7 +140,7 @@ int main(int argc, char* argv[]) {
         GPU::Reduce reducef(mappedwm, setsize);
         q.wait();
         run();
-        reducef.runkernel(result, q,localsize);
+        reducef.runkernel(q,localsize);
         q.wait();
         stop(q);
 
@@ -172,7 +171,7 @@ int main(int argc, char* argv[]) {
 
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize);
         run(); //N
-           reducef.runkernel(result,q,localsize);
+           reducef.runkernel(q,localsize);
             q.wait();
             stop(q);
         //reducef.seqRed(reinterpret_cast<CPU::Mapped*>(mappedwm),result1,N);
@@ -203,7 +202,7 @@ int main(int argc, char* argv[]) {
         localsize=lssc;
         CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize); //N
         run();
-        reducef.runkernel(result, cpu_q,localsize);
+        reducef.runkernel(cpu_q,localsize);
         cpu_q.wait();
         stop(cpu_q);
         print_mapped_counts(mappedwm,setsize, k);
@@ -214,7 +213,6 @@ int main(int argc, char* argv[]) {
     std::cout<<"check output.txt in /home/user/project/output.txt"<<std::endl;
     sycl::free(flat_data, q);
     sycl::free(mappedwm, q);
-    sycl::free(result, q); 
 }
 
 

@@ -72,8 +72,7 @@ bool Reduce::lex_compare(const Mapped &a, const Mapped &b) {
 }
 
 void Reduce::operator()(sycl::nd_item<1> it,
-                        sycl::local_accessor<int, 1> shared,
-                        int* result) const {
+                        sycl::local_accessor<int, 1> shared) const {
     size_t gid = it.get_global_id(0);
     size_t mapped_size = rN;
     if (gid >= rN) return; 
@@ -119,26 +118,9 @@ void Reduce::operator()(sycl::nd_item<1> it,
         } 
     }
 
-    constexpr int blocksize = 512;
-    size_t lid = it.get_local_id(0);
-    shared[lid] = (gid < rN && mappedw[gid].v > 0) ? mappedw[gid].v : 0;
-    it.barrier(sycl::access::fence_space::local_space);
-
-    for (size_t s = blocksize / 2; s > 0; s >>= 1) {
-        if (lid < s) shared[lid] += shared[lid + s];
-        it.barrier(sycl::access::fence_space::local_space);
-    }
-
-    if (lid == 0) {
-        sycl::atomic_ref<int,
-            sycl::memory_order::relaxed,
-            sycl::memory_scope::device,
-            sycl::access::address_space::global_space> afr(result[0]);
-        afr.fetch_add(shared[0]);
-    }
 }
 
-void Reduce::runkernel(int* result, sycl::queue& q,size_t lsize) const {
+void Reduce::runkernel( sycl::queue& q,size_t lsize) const {
         std::stable_sort(mappedw, mappedw + rN,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
@@ -149,7 +131,7 @@ void Reduce::runkernel(int* result, sycl::queue& q,size_t lsize) const {
     q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
         h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
-            self(it, shared, result);
+            self(it, shared);
         });
     }).wait();
 }

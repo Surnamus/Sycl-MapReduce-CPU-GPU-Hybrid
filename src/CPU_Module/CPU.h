@@ -40,9 +40,8 @@ namespace CPU {
         Reduce(Mapped* _mappedw, size_t _rN);
         static bool lex_compare(const Mapped &a, const Mapped &b);
         void operator()(sycl::nd_item<1> it,
-                        sycl::local_accessor<int, 1> shared,
-                        int* result) const;
-        void runkernel(int* result, sycl::queue& _q,size_t lsize) const;
+                        sycl::local_accessor<int, 1> shared) const;
+        void runkernel(sycl::queue& _q,size_t lsize) const;
         void seqRed(Mapped* mappedw,size_t* newsize,size_t s);
     };
 }

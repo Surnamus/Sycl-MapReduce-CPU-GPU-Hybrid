@@ -38,9 +38,8 @@ namespace GPU{
       Reduce(Mapped* _mappedw, std::size_t _rN);
 
       void operator()(sycl::nd_item<1> it,
-                      sycl::local_accessor<int, 1> shared,
-                      int* result) const;
-      void runkernel(int* result, sycl::queue q,size_t lsize) const;
+                      sycl::local_accessor<int, 1> shared) const;
+      void runkernel( sycl::queue q,size_t lsize) const;
      // void radixsort(sycl::queue &q, size_t k) const;
   };
 }
