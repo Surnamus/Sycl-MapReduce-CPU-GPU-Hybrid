@@ -29,11 +29,13 @@ run_experiments() {
   #because the program is using JIT compiler, compile for zero in the first run so that compiler
   #optimises itself properly and then actually start using the Nstart
   for k in "${Karr[@]}"; do
+  for i in 1 2 3 4; do
     for device in 1 2 3; do
       echo "first runs, they iterate over K, get rid of JIT warning"
       #big N
       ./execute.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
      /home/user/project/build/project 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" #>"$fifo" 2>&1 & bg_pid=$!
+    done
     done
   done
   file4="/home/user/project/logs/measurements.log"
