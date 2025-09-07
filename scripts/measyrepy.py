@@ -195,9 +195,6 @@ except Exception:
 # Optional: make GPU host-sync deterministic if requested
 MEASURE_SYNC_GPU = os.environ.get("MEASURE_SYNC_GPU", "0") == "1"
 
-# -------------------------
-# launch_program (thin change: inject MEASURE_SYNC_GPU env vars if requested)
-# -------------------------
 def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Popen:
     base_cmd = [path] + args
     if shutil.which('stdbuf'):
@@ -298,9 +295,7 @@ def measure_from_process(proc: subprocess.Popen, met_index: int):
             break
     return vals
 
-# -------------------------
-# main (unchanged)
-# -------------------------
+
 binary = '/home/user/project/build/project'
 prog_args = [N, K, LS, BS, dev]
 try:
