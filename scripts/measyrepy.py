@@ -8,8 +8,13 @@ import subprocess
 import shutil
 from decimal import Decimal, getcontext
 from typing import Tuple, Optional
+import ctypes
 
-import pynvml
+# NVML for GPU metrics (best-effort)
+try:
+    import pynvml
+except Exception:
+    pynvml = None
 
 getcontext().prec = 30
 
@@ -28,7 +33,55 @@ except ValueError:
     print(f"Warning: invalid metric index '{met}' - defaulting to 0 (time)", file=sys.stderr)
     met_i = 0
 
+# -------------------------
+# small jitter-reduction for measurer (best-effort)
+# -------------------------
+_libc = None
+try:
+    _libc = ctypes.CDLL("libc.so.6", use_errno=True)
+except Exception:
+    _libc = None
 
+def _try_mlockall():
+    if not _libc:
+        return
+    try:
+        MCL_CURRENT = 1
+        MCL_FUTURE = 2
+        res = _libc.mlockall(MCL_CURRENT | MCL_FUTURE)
+        if res != 0:
+            # non-fatal
+            pass
+    except Exception:
+        pass
+
+def _try_pin_measurer_to_core(core: int):
+    try:
+        os.sched_setaffinity(0, {core})
+    except Exception:
+        pass
+
+_cpu_count = os.cpu_count() or 1
+_pin_core = max(0, _cpu_count - 1)
+_try_mlockall()
+_try_pin_measurer_to_core(_pin_core)
+
+# -------------------------
+# timing helper (use raw monotonic when available)
+# -------------------------
+_has_clock_raw = hasattr(time, "CLOCK_MONOTONIC_RAW")
+_clock = time.CLOCK_MONOTONIC_RAW if _has_clock_raw else time.CLOCK_MONOTONIC
+
+def now_ns() -> int:
+    # time.clock_gettime_ns is available on modern Python; fallback to perf_counter_ns
+    try:
+        return time.clock_gettime_ns(_clock)
+    except Exception:
+        return time.perf_counter_ns()
+
+# -------------------------
+# original helpers (kept)
+# -------------------------
 def read_cpu_times() -> Tuple[int, int]:
     """Return (total, idle_all) as integers like the bash helper."""
     with open('/proc/stat', 'r') as f:
@@ -85,14 +138,17 @@ def read_mem_used_mb() -> int:
     used_kb = mem_total_kb - mem_avail_kb
     return used_kb // 1024
 
-
+# -------------------------
+# NVML init (unchanged)
+# -------------------------
 gpu_handle = None
-try:
-    pynvml.nvmlInit()
-    if pynvml.nvmlDeviceGetCount() > 0:
-        gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-except Exception:
-    gpu_handle = None
+if pynvml is not None:
+    try:
+        pynvml.nvmlInit()
+        if pynvml.nvmlDeviceGetCount() > 0:
+            gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+    except Exception:
+        gpu_handle = None
 
 
 def read_gpu_metrics() -> tuple[int, int, int]:
@@ -107,7 +163,41 @@ def read_gpu_metrics() -> tuple[int, int, int]:
     except Exception:
         return 0, 0, 0
 
+# -------------------------
+# NEW: per-process CPU ticks (sums threads) helper
+# -------------------------
+def read_proc_cpu_ticks(pid: int) -> int:
+    """
+    Return sum of utime+stime+cutime+cstime in clock ticks for pid.
+    Handles spaces in the comm field by locating the final ')' and parsing the remainder.
+    """
+    try:
+        with open(f"/proc/{pid}/stat", "r") as f:
+            content = f.read()
+        rparen = content.rfind(')')
+        if rparen == -1:
+            return 0
+        rest = content[rparen + 2 :].split()
+        # Fields after comm: rest[0] is state; utime is field 14 => rest index 11
+        utime = int(rest[11])
+        stime = int(rest[12])
+        cutime = int(rest[13])
+        cstime = int(rest[14])
+        return utime + stime + cutime + cstime
+    except Exception:
+        return 0
 
+try:
+    CLK_TCK = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
+except Exception:
+    CLK_TCK = 100
+
+# Optional: make GPU host-sync deterministic if requested
+MEASURE_SYNC_GPU = os.environ.get("MEASURE_SYNC_GPU", "0") == "1"
+
+# -------------------------
+# launch_program (thin change: inject MEASURE_SYNC_GPU env vars if requested)
+# -------------------------
 def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Popen:
     base_cmd = [path] + args
     if shutil.which('stdbuf'):
@@ -116,6 +206,10 @@ def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Po
         cmd = base_cmd
     env = os.environ.copy()
     env['device'] = device_env
+    if MEASURE_SYNC_GPU:
+        # make kernel launches blocking from the host so host-timed interval covers GPU work
+        env['CUDA_LAUNCH_BLOCKING'] = '1'
+        env['HIP_LAUNCH_BLOCKING'] = '1'
     p = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -126,30 +220,34 @@ def launch_program(path: str, args: list[str], device_env: str) -> subprocess.Po
     )
     return p
 
-
+# -------------------------
+# measurement (core change: use per-process CPU ticks)
+# -------------------------
 def measure_from_process(proc: subprocess.Popen, met_index: int):
     vals: list[str] = []
 
     def measure_phase_blocking() -> Optional[str]:
         try:
             start_time_ns = None
-            prev_total, prev_idle = read_cpu_times()
+            prev_proc_ticks = 0
+            # Wait for START
             while True:
                 line = proc.stdout.readline()
                 if line == '':
                     return None
                 line = line.rstrip('\n').rstrip('\r')
                 if 'START' in line:
-                    start_time_ns = time.perf_counter_ns()
-                    prev_total, prev_idle = read_cpu_times()
+                    start_time_ns = now_ns()
+                    prev_proc_ticks = read_proc_cpu_ticks(proc.pid)
                     break
+            # Wait for STOP
             while True:
                 line = proc.stdout.readline()
                 if line == '':
                     return None
                 line = line.rstrip('\n').rstrip('\r')
                 if 'STOP' in line:
-                    end_time_ns = time.perf_counter_ns()
+                    end_time_ns = now_ns()
                     break
         except Exception:
             return None
@@ -158,14 +256,22 @@ def measure_from_process(proc: subprocess.Popen, met_index: int):
 
         cpu_temp = read_cpu_temp_c()
 
-        now_total, now_idle = read_cpu_times()
-        totald = now_total - prev_total
-        idled = now_idle - prev_idle
-        if totald > 0:
-            cpu_util = int(((totald - idled) * 100) / totald)
+        now_proc_ticks = read_proc_cpu_ticks(proc.pid)
+        delta_ticks = max(0, now_proc_ticks - prev_proc_ticks)
+        delta_proc_seconds = delta_ticks / CLK_TCK if CLK_TCK > 0 else 0.0
+
+        elapsed_seconds = (end_time_ns - start_time_ns) / 1_000_000_000.0
+        if elapsed_seconds > 0:
+            cpu_percent_single = (delta_proc_seconds / elapsed_seconds) * 100.0
+        else:
+            cpu_percent_single = 0.0
+
+        # integer percent relative to a single CPU (200 = two full cores)
+        try:
+            cpu_util = int(round(cpu_percent_single))
             if cpu_util < 0:
                 cpu_util = 0
-        else:
+        except Exception:
             cpu_util = 0
 
         cpu_mem = read_mem_used_mb()
@@ -192,7 +298,9 @@ def measure_from_process(proc: subprocess.Popen, met_index: int):
             break
     return vals
 
-
+# -------------------------
+# main (unchanged)
+# -------------------------
 binary = '/home/user/project/build/project'
 prog_args = [N, K, LS, BS, dev]
 try:
@@ -212,7 +320,8 @@ finally:
         except Exception:
             pass
     try:
-        pynvml.nvmlShutdown()
+        if pynvml is not None:
+            pynvml.nvmlShutdown()
     except Exception:
         pass
 
