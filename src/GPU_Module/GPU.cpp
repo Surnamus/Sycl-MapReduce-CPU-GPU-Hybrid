@@ -44,14 +44,15 @@ void Map::operator()(sycl::nd_item<1> it) const  {
     mappedw[gid].v = 1;
 }
 
-void Map::runkernel(sycl::queue q,size_t lsize) const {
+sycl::event  Map::runkernel(sycl::queue q,size_t lsize) const {
     size_t local_size = lsize;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
-    q.submit([&](sycl::handler& h) {
+   sycl::event e = q.submit([&](sycl::handler& h) {
         h.parallel_for<Map>(ndr, *this);
-    }).wait();
+    });
+    return e;
 }
 
 Reduce::Reduce(Mapped* _mappedw, std::size_t _rN)
@@ -111,7 +112,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
 
 //here
 
-void Reduce::runkernel( sycl::queue q,size_t lsize) const {
+sycl::event  Reduce::runkernel( sycl::queue q,size_t lsize) const {
     size_t local_size = lsize; //was 512
     size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
@@ -133,14 +134,14 @@ void Reduce::runkernel( sycl::queue q,size_t lsize) const {
 //0/10
 acpp::algorithms::sort(q,mappedw,mappedw+rN,cmp);
     auto self = *this; 
-    q.submit([&](sycl::handler& h) {
+   sycl::event e =  q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
         h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
             self(it, shared);
         });
-    }).wait();
+    });
     //HERE
-
+return e;
 }
 
 } // namespace GPU

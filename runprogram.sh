@@ -29,36 +29,41 @@ run_experiments() {
   #because the program is using JIT compiler, compile for zero in the first run so that compiler
   #optimises itself properly and then actually start using the Nstart
   for k in "${Karr[@]}"; do
-  for i in 1 2 3 4; do
+    for i in 1 2 3; do
     for device in 1 2 3; do
       echo "first runs, they iterate over K, get rid of JIT warning"
       #big N
       ./execute.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
-     /home/user/project/build/project 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" #>"$fifo" 2>&1 & bg_pid=$!
+     /home/user/project/build/project 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" "$metric" #>"$fifo" 2>&1 & bg_pid=$!
     done
     done
-  done
-  file4="/home/user/project/logs/measurements.log"
-  for k in "${Karr[@]}"; do
-    local N="$N_start"
-    local Ncount="$NumberOfNs"
-    truncate -s 0 "$file3"
+    done
+   file4="/home/user/project/logs/measurements.log"
+    truncate -s 0 "$file4"
+    for k in "${Karr[@]}"; do
+      local N="$N_start"
+      local Ncount="$NumberOfNs"
+      cat "$file3" >> "$RAWFILE"
+      truncate -s 0 "$file3"
     #truncate -s 0 "$file4"  
     while [ "$Ncount" -gt 0 ]; do
       local idx=$(( NumberOfNs - Ncount ))
       local localsize_elem="${localsizearr[$idx]}"
       local localsizecpu_elem="${localsizearrcpuhyb[$idx]}"
+      local BINARY=" /home/user/project/build/project"
       for device in 1 2 3; do
         echo "Running with N=$N, K=$k, LS=$localsize_elem, BS=$localsizecpu_elem, dev=$device..."
 
         ./execute.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device"
 
-        val=$(./scripts/measyrepy.py "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")
+        /home/user/project/build/project "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric"
+                  #int N,int k, int lls,int llsc,int device,int metric,double value
+        #pass that from cpp nad it will work in that way
         #val=$(./scripts/measure.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")
-        printf "%s %s %s %s %s %s %s\n" \
-          "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$POINTS_FILE"
-                printf "%s %s %s %s %s %s %s\n" \
-          "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$RAWFILE"
+      #  printf "%s %s %s %s %s %s %s\n" \
+     #     "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$POINTS_FILE"
+     #           printf "%s %s %s %s %s %s %s\n" \
+     #     "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" "$val" >> "$RAWFILE"
 
       done
 
@@ -89,7 +94,7 @@ run_experiments() {
     fi
     printf "%s"  "----\n" >> "$RAWFILE"
   done
-
+  cat "$POINTS_FILE" >> "$RAWFILE"
   echo "Done. All data points written to: $POINTS_FILE"
   
 }
@@ -114,6 +119,7 @@ echo "the second case, input the localsizes for gpu (up to 512) :"
 read -a bs
 echo "the second case, input the localizes for cpu (up to 512), same size as bsc:"
 read -a bsc
+truncate -s 0 "$file3"
 
 rm -rf build/* && cmake -B build -S . -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel 4
 printf "BEGIN" >> "$RAWFILE"

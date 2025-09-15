@@ -49,15 +49,16 @@ void Map::operator()(sycl::nd_item<1> it) const {
     mappedw[gid].v = 1;
 }
 
-void Map::runkernel(sycl::queue& q,size_t lsize) const {
+sycl::event  Map::runkernel(sycl::queue& q,size_t lsize) const {
     size_t local_size = lsize;
     size_t global_size = ((N + local_size - 1) / local_size) * local_size;
 
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
 
-    q.submit([&](sycl::handler& h) {
+   sycl::event e =  q.submit([&](sycl::handler& h) {
         h.parallel_for<Map>(ndr, *this);
-    }).wait();
+    });
+    return e;
 }
 
 Reduce::Reduce(Mapped* _mappedw, size_t _rN)
@@ -120,7 +121,7 @@ void Reduce::operator()(sycl::nd_item<1> it,
 
 }
 
-void Reduce::runkernel( sycl::queue& q,size_t lsize) const {
+sycl::event Reduce::runkernel( sycl::queue& q,size_t lsize) const {
         std::stable_sort(mappedw, mappedw + rN,
         [](const Mapped &a, const Mapped &b) { return std::strcmp(a.word, b.word) < 0; });
 
@@ -128,12 +129,13 @@ void Reduce::runkernel( sycl::queue& q,size_t lsize) const {
     size_t global_size = ((rN + local_size - 1) / local_size) * local_size;
     sycl::nd_range<1> ndr{{global_size}, {local_size}};
             auto self =(*this);
-    q.submit([&](sycl::handler& h) {
+    sycl::event e = q.submit([&](sycl::handler& h) {
         sycl::local_accessor<int, 1> shared(sycl::range<1>(local_size), h);
         h.parallel_for<Reduce>(ndr, [=](sycl::nd_item<1> it) {
             self(it, shared);
         });
-    }).wait();
+    });
+    return e;
 }
 
 

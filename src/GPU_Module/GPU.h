@@ -28,7 +28,7 @@ namespace GPU{
       Map(char* _data, std::size_t _N, int _k);
 
       void operator()(sycl::nd_item<1> it) const;
-      void runkernel(sycl::queue q, size_t lsize) const;
+      sycl::event  runkernel(sycl::queue q, size_t lsize) const;
   };
 
   struct Reduce{
@@ -39,7 +39,7 @@ namespace GPU{
 
       void operator()(sycl::nd_item<1> it,
                       sycl::local_accessor<int, 1> shared) const;
-      void runkernel( sycl::queue q,size_t lsize) const;
+      sycl::event  runkernel( sycl::queue q,size_t lsize) const;
      // void radixsort(sycl::queue &q, size_t k) const;
   };
 }

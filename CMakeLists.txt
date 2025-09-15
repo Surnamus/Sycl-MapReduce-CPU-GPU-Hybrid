@@ -20,7 +20,13 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${PROJECT_SOURCE_DIR}/src/CPU_Module
     ${PROJECT_SOURCE_DIR}/src/Hybrid_CPU_GPU
 )
-
+target_include_directories(${PROJECT_NAME} PRIVATE
+    /usr/local/cuda/include
+    /usr/include/hwloc
+)
+target_link_libraries(${PROJECT_NAME} PRIVATE
+  /usr/lib/x86_64-linux-gnu/libnvidia-ml.so   # <-- NVML shared library
+)
 set(ENV{ACPP_ADAPTIVITY_LEVEL} "0")
 
 message(STATUS "AdaptiveCpp JIT optimizations disabled (ACPP_ADAPTIVITY_LEVEL=0)")

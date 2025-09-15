@@ -30,7 +30,7 @@ namespace CPU {
 
         Map(char* _data, std::size_t _N, int _k);
         void operator()(sycl::nd_item<1> it) const;
-        void runkernel(sycl::queue& _q,size_t lsize) const;
+        sycl::event  runkernel(sycl::queue& _q,size_t lsize) const;
     };
 
     struct Reduce {
@@ -41,7 +41,7 @@ namespace CPU {
         static bool lex_compare(const Mapped &a, const Mapped &b);
         void operator()(sycl::nd_item<1> it,
                         sycl::local_accessor<int, 1> shared) const;
-        void runkernel(sycl::queue& _q,size_t lsize) const;
+        sycl::event  runkernel(sycl::queue& _q,size_t lsize) const;
         void seqRed(Mapped* mappedw,size_t* newsize,size_t s);
     };
 }
