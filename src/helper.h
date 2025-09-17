@@ -127,18 +127,19 @@ public:
 
     void setKernelEvent(const sycl::event& e) { kernelEvent = e; }
 
-    void Metric(const std::string& signal, int metricIndex) {
+    void Metric(const std::string& signal, int metricIndex, bool isCPU = false) {
         if (signal == "START") {
             running = true;
-            cpu.snapshotStart();
-            return;
-        }
-        if (signal == "STOP") {
+            if (isCPU) {
+                cpuStart = std::chrono::high_resolution_clock::now();
+            } else {
+                // GPU: rely on SYCL event, but keep CPU snapshot for utilization
+                cpu.snapshotStart();
+            }
+        } else if (signal == "STOP") {
             running = false;
-            double value = sampleMetric(metricIndex);
-            sums[metricIndex] += value; 
-            std::cout << value << std::endl;
-            std::cout.flush();
+            double value = sampleMetric(metricIndex, isCPU);
+            sums[metricIndex] += value;
         }
     }
 
@@ -152,28 +153,45 @@ public:
 private:
     bool running = false;
     sycl::event kernelEvent;
+
     CpuMonitor cpu;
     GpuMonitor gpu;
+
+    std::chrono::high_resolution_clock::time_point cpuStart;
     std::unordered_map<int,double> sums;
 
-    double sampleMetric(int metricIndex) {
-        switch(metricIndex){
-            case 0: return getKernelTimeMs(kernelEvent);
-            case 1: return static_cast<double>(gpu.getUtil());
-            case 2: return cpu.getUtilSinceSnapshot();
-            case 3: return static_cast<double>(gpu.getMemMB());
-            case 4: return static_cast<double>(cpu.getMemMB());
-            case 5: return static_cast<double>(gpu.getTempC());
-            case 6: return static_cast<double>(cpu.getTemp());
-            default: return 0.0;
+    double sampleMetric(int metricIndex, bool isCPU) {
+        switch (metricIndex) {
+            case 0: // kernel time
+                return isCPU ? getKernelTimeMsCPU() : getKernelTimeMsGPU(kernelEvent);
+            case 1: // GPU Util (%)
+                return static_cast<double>(gpu.getUtil());
+            case 2: // CPU Util (%) over last START->STOP
+                return cpu.getUtilSinceSnapshot();
+            case 3: // GPU Mem (MB)
+                return static_cast<double>(gpu.getMemMB());
+            case 4: // CPU Mem (MB)
+                return static_cast<double>(cpu.getMemMB());
+            case 5: // GPU Temp (C)
+                return static_cast<double>(gpu.getTempC());
+            case 6: // CPU Temp (C)
+                return static_cast<double>(cpu.getTemp());
+            default:
+                return 0.0;
         }
     }
 
-    double getKernelTimeMs(const sycl::event& e) {
+    // GPU kernel timing from SYCL event
+    double getKernelTimeMsGPU(const sycl::event &e) {
         auto start = e.get_profiling_info<sycl::info::event_profiling::command_start>();
         auto end   = e.get_profiling_info<sycl::info::event_profiling::command_end>();
-        return (end - start) * 1e-6; // ns -> ms
+        return (end - start) * 1e-6; // ns → ms
+    }
+
+    // CPU kernel timing using chrono
+    double getKernelTimeMsCPU() {
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration<double, std::milli>(end - cpuStart).count();
     }
 };
-
 #endif // HELPER_H

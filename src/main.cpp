@@ -16,13 +16,15 @@ std::string safe_num_to_string(int val) {
     if (val == 0) return "null";
     return std::to_string(val);
 }
-void POINTSFILE(int N,int k, int lls,int llsc,int device,int metric,double value){
+void POINTSFILE(int N,int k, int lls,int llsc,int device,int metric,double value,bool warmup){
     //std::string s="";
+    if (warmup) return;
+    else{
     std::string s = std::to_string(N) + " " + std::to_string(k) + " " + std::to_string(lls) + " " + 
         std::to_string(llsc) + " " + std::to_string(device) + " " +std::to_string(metric) + " " + std::to_string(value);
     
     std::ofstream outFile("points.txt", std::ios::app); 
-
+    std::ofstream outFileD("DATA.txt", std::ios::app); 
     if (outFile.is_open()) {
         outFile << s << std::endl;
         outFile.close();
@@ -30,6 +32,7 @@ void POINTSFILE(int N,int k, int lls,int llsc,int device,int metric,double value
     } else {
         std::cerr << "Error opening file!" << std::endl;
     }
+}
 }
 void print_mapped_countst(GPU::Mapped* mappedw, size_t setsize, int k) {
     for (size_t i = 0; i < setsize; ++i) {
@@ -47,7 +50,6 @@ int compute_unique_total(GPU::Mapped* mappedw, size_t setsize) {
     return total;
 }
 
-// Safe printer for CPU::Mapped (uses bounded length)
 void print_mapped_counts(GPU::Mapped* mappedw, size_t setsize, int k) {
     std::ofstream out("/home/user/project/output.txt"); // hardcoded output file
     if (!out) {
@@ -99,7 +101,7 @@ std::pair<std::string, std::vector<size_t>> convert(std::vector<std::string> str
 
 
 int main(int argc, char* argv[]) {
-       if (argc <7) {
+       if (argc <8) {
         std::cerr << "NOT ENOUGH ARGUMENTS IMAGINE LOL"<<std::endl;
         return 1;
     }
@@ -111,7 +113,7 @@ int main(int argc, char* argv[]) {
     size_t lssc = std::atoi(argv[4]);
     int device = std::stoi(argv[5]);
     int metricIndex = std::stoi(argv[6]);
-
+    bool warmup= std::stoi(argv[7]);
 
     std::vector<std::string> datav = prepare();
     std::cout << "Finished preparing!" << std::endl;
@@ -149,20 +151,20 @@ if (device == 1) {
 
     sycl::event e_map = mapf.runkernel(q, localsize);
     profiler.setKernelEvent(e_map);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,false);
     e_map.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,false);
 
     // Reduce kernel
     GPU::Reduce reducef(mappedwm, setsize);
     sycl::event e_red = reducef.runkernel(q, localsize);
     profiler.setKernelEvent(e_red);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,false);
     e_red.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,false);
     double result = profiler.getSum(metricIndex);
 
-    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result);
+    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result,warmup);
 
     std::vector<GPU::Mapped> host_mapped(setsize);
     q.memcpy(host_mapped.data(), mappedwm, setsize * sizeof(GPU::Mapped)).wait();
@@ -180,25 +182,23 @@ else if (device == 2) {
         std::memset(mappedwm[i].word, 0, sizeof(mappedwm[i].word));
     }
 
-    // Map kernel (CPU path)
     CPU::Map mapf(flat_data, N, k);
     mapf.mappedw = reinterpret_cast<CPU::Mapped*>(mappedwm);
     sycl::event e_map = mapf.runkernel(q, localsize);
     profiler.setKernelEvent(e_map);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,true);
     e_map.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,true);
 
-    // Reduce kernel (CPU path)
     CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize);
     sycl::event e_red = reducef.runkernel(q, localsize);
     profiler.setKernelEvent(e_red);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,true);
     e_red.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,true);
     double result = profiler.getSum(metricIndex);
 
-    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result);
+    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result,warmup);
     print_mapped_counts(mappedwm, setsize, k);
 
 }
@@ -222,9 +222,9 @@ else {
     mapf.mappedw = mappedwm;
     sycl::event e_map = mapf.runkernel(gpu_q, localsize);
     profiler.setKernelEvent(e_map);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,false);
     e_map.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,false);
 
     localsize = lssc;
 
@@ -232,12 +232,12 @@ else {
     CPU::Reduce reducef(reinterpret_cast<CPU::Mapped*>(mappedwm), setsize);
     sycl::event e_red = reducef.runkernel(cpu_q, localsize);
     profiler.setKernelEvent(e_red);
-    profiler.Metric("START", metricIndex);
+    profiler.Metric("START", metricIndex,true);
     e_red.wait();
-    profiler.Metric("STOP", metricIndex);
+    profiler.Metric("STOP", metricIndex,true);
     double result = profiler.getSum(metricIndex);
 
-    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result);
+    POINTSFILE(N,k,localsize,lssc,device,metricIndex,result,warmup);
     print_mapped_counts(mappedwm, setsize, k);
 
 }

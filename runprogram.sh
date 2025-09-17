@@ -29,21 +29,22 @@ run_experiments() {
   #because the program is using JIT compiler, compile for zero in the first run so that compiler
   #optimises itself properly and then actually start using the Nstart
   for k in "${Karr[@]}"; do
-    for i in 1 2 3; do
+    for i in 1 2 3 4 5; do
     for device in 1 2 3; do
       echo "first runs, they iterate over K, get rid of JIT warning"
       #big N
-      ./execute.sh 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
-     /home/user/project/build/project 5000000 "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" "$metric" #>"$fifo" 2>&1 & bg_pid=$!
+       ((t=i*1000000))
+      ./execute.sh "$t" "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device"
+     /home/user/project/build/project "$t"  "${k}" "${localsizearr[0]}" "${localsizearrcpuhyb[0]}" "$device" "$metric" 1
     done
     done
     done
+    truncate -s 0 "$POINTS_FILE"
    file4="/home/user/project/logs/measurements.log"
     truncate -s 0 "$file4"
     for k in "${Karr[@]}"; do
       local N="$N_start"
       local Ncount="$NumberOfNs"
-      cat "$file3" >> "$RAWFILE"
       truncate -s 0 "$file3"
     #truncate -s 0 "$file4"  
     while [ "$Ncount" -gt 0 ]; do
@@ -56,7 +57,7 @@ run_experiments() {
 
         ./execute.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device"
 
-        /home/user/project/build/project "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric"
+        /home/user/project/build/project "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric" 0
                   #int N,int k, int lls,int llsc,int device,int metric,double value
         #pass that from cpp nad it will work in that way
         #val=$(./scripts/measure.sh "$N" "$k" "$localsize_elem" "$localsizecpu_elem" "$device" "$metric")

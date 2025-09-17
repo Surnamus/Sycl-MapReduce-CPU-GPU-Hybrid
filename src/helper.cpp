@@ -132,7 +132,7 @@ private:
     }
 
     int getTempC() {
-        std::ifstream f("/sys/class/thermal/thermal_zone0/temp");
+        std::ifstream f("/sys/class/hwmon/hwmon0/temp1_input");
         if (!f) return 0;
         int t=0;
         if (!(f >> t)) return 0;
@@ -176,13 +176,18 @@ public:
 
     void setKernelEvent(const sycl::event& e) { kernelEvent = e; }
 
-    void Metric(const std::string& signal, int metricIndex) {
+    void Metric(const std::string& signal, int metricIndex, bool isCPU = false) {
         if (signal == "START") {
             running = true;
-            cpu.snapshotStart();
+            if (isCPU) {
+                cpuStart = std::chrono::high_resolution_clock::now();
+            } else {
+                // GPU: rely on SYCL event, but keep CPU snapshot for utilization
+                cpu.snapshotStart();
+            }
         } else if (signal == "STOP") {
             running = false;
-            double value = sampleMetric(metricIndex);
+            double value = sampleMetric(metricIndex, isCPU);
             sums[metricIndex] += value;
         }
     }
@@ -197,14 +202,17 @@ public:
 private:
     bool running = false;
     sycl::event kernelEvent;
+
     CpuMonitor cpu;
     GpuMonitor gpu;
+
+    std::chrono::high_resolution_clock::time_point cpuStart;
     std::unordered_map<int,double> sums;
 
-    double sampleMetric(int metricIndex) {
+    double sampleMetric(int metricIndex, bool isCPU) {
         switch (metricIndex) {
-            case 0: // kernel time (ms) — must have kernelEvent set by caller
-                return  getKernelTimeMs(kernelEvent);
+            case 0: // kernel time
+                return isCPU ? getKernelTimeMsCPU() : getKernelTimeMsGPU(kernelEvent);
             case 1: // GPU Util (%)
                 return static_cast<double>(gpu.getUtil());
             case 2: // CPU Util (%) over last START->STOP
@@ -222,10 +230,16 @@ private:
         }
     }
 
-    double getKernelTimeMs(const sycl::event &e) {
+    // GPU kernel timing from SYCL event
+    double getKernelTimeMsGPU(const sycl::event &e) {
         auto start = e.get_profiling_info<sycl::info::event_profiling::command_start>();
         auto end   = e.get_profiling_info<sycl::info::event_profiling::command_end>();
-        return (end - start) * 1e-6;
+        return (end - start) * 1e-6; // ns → ms
     }
-};
-}
+
+    // CPU kernel timing using chrono
+    double getKernelTimeMsCPU() {
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration<double, std::milli>(end - cpuStart).count();
+    }
+};}
