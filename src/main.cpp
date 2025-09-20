@@ -25,9 +25,11 @@ void POINTSFILE(int N,int k, int lls,int llsc,int device,int metric,double value
     
     std::ofstream outFile("points.txt", std::ios::app); 
     std::ofstream outFileD("DATA.txt", std::ios::app); 
-    if (outFile.is_open()) {
+    if ( outFile.is_open() && outFileD.is_open()) {
         outFile << s << std::endl;
         outFile.close();
+        outFileD << s << std::endl;
+        outFileD.close();
         std::cout << "Content appended to file." << std::endl;
     } else {
         std::cerr << "Error opening file!" << std::endl;
